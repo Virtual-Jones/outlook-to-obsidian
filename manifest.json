@@ -1,0 +1,49 @@
+{
+  "manifest_version": 3,
+  "name": "Outlook to Obsidian Meeting Notes",
+  "version": "1.1.0",
+  "description": "Extract meeting details from Outlook Web and create formatted notes in Obsidian",
+  "author": "Your Name",
+  
+  "permissions": [
+    "activeTab",
+    "clipboardWrite",
+    "storage",
+	"scripting"
+  ],
+  
+  "host_permissions": [
+    "https://outlook.office.com/*",
+    "https://outlook.office365.com/*",
+    "https://outlook.live.com/*"
+  ],
+  
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icon16.png",
+      "48": "icon48.png",
+      "128": "icon128.png"
+    }
+  },
+  
+  "options_page": "options.html",
+  
+  "content_scripts": [
+    {
+      "matches": [
+        "https://outlook.office.com/*",
+        "https://outlook.office365.com/*",
+        "https://outlook.live.com/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  
+  "icons": {
+    "16": "icon16.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  }
+}

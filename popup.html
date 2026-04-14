@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body {
+      width: 350px;
+      min-height: 200px;
+      padding: 15px;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #f5f5f5;
+      margin: 0;
+    }
+    
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 15px;
+    }
+    
+    h1 {
+      font-size: 16px;
+      color: #0078d4;
+      margin: 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .settings-btn {
+      width: 28px;
+      height: 28px;
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s;
+    }
+    
+    .settings-btn:hover {
+      background: #e1dfdd;
+    }
+    
+    button {
+      width: 100%;
+      padding: 12px;
+      background: #0078d4;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    
+    button:hover {
+      background: #106ebe;
+    }
+    
+    button:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+    
+    .status {
+      padding: 10px;
+      border-radius: 4px;
+      margin-top: 10px;
+      font-size: 13px;
+      display: none;
+    }
+    
+    .status.success {
+      background: #d4f4dd;
+      color: #0e7c3a;
+      border: 1px solid #0e7c3a20;
+      display: block;
+    }
+    
+    .status.error {
+      background: #fee;
+      color: #d83b01;
+      border: 1px solid #d83b0120;
+      display: block;
+    }
+    
+    .status.info {
+      background: #e6f3ff;
+      color: #0078d4;
+      border: 1px solid #0078d420;
+      display: block;
+    }
+    
+    .config-info {
+      margin: 15px 0;
+      padding: 10px;
+      background: white;
+      border-radius: 4px;
+      font-size: 12px;
+      color: #605e5c;
+      border: 1px solid #e1dfdd;
+    }
+    
+    .config-row {
+      display: flex;
+      margin-bottom: 4px;
+    }
+    
+    .config-label {
+      font-weight: 600;
+      min-width: 50px;
+    }
+    
+    .config-value {
+      flex: 1;
+      color: #323130;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    
+    .details {
+      margin-top: 10px;
+      padding: 10px;
+      background: white;
+      border-radius: 4px;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+    
+    .detail-row {
+      display: flex;
+      margin-bottom: 5px;
+    }
+    
+    .detail-label {
+      font-weight: 600;
+      min-width: 80px;
+    }
+    
+    .detail-value {
+      flex: 1;
+      color: #605e5c;
+    }
+    
+    .no-config-warning {
+      padding: 10px;
+      background: #fff4ce;
+      border: 1px solid #ffc83d;
+      border-radius: 4px;
+      font-size: 12px;
+      color: #323130;
+      margin-bottom: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>
+      <span>📅</span>
+      <span>Outlook to Obsidian</span>
+    </h1>
+    <button class="settings-btn" id="settingsBtn" title="Settings">⚙️</button>
+  </div>
+  
+  <div id="configWarning" class="no-config-warning" style="display: none;">
+    ⚠️ Please configure your vault settings first
+  </div>
+  
+  <div class="config-info">
+    <div class="config-row">
+      <span class="config-label">Vault:</span>
+      <span class="config-value" id="vaultDisplay">Loading...</span>
+    </div>
+    <div class="config-row">
+      <span class="config-label">Path:</span>
+      <span class="config-value" id="pathDisplay">Loading...</span>
+    </div>
+  </div>
+  
+  <button id="extractBtn">
+    <span>📧</span>
+    <span>Extract Meeting Details</span>
+  </button>
+  
+  <button id="createObsidianBtn" style="display: none;">
+    <span>📝</span>
+    <span>Create in Obsidian</span>
+  </button>
+  
+  <div id="status" class="status"></div>
+  
+  <div id="details" class="details" style="display: none;"></div>
+  
+  <script src="popup.js"></script>
+</body>
+</html>
