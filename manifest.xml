@@ -1,0 +1,186 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<!--
+  Outlook to Obsidian — Office Add-in Manifest
+  =============================================
+  BEFORE DEPLOYING: replace every occurrence of https://YOUR-HOST/outlook-to-obsidian
+  with the URL where you are hosting these files (e.g. GitHub Pages):
+    https://<your-github-username>.github.io/outlook-to-obsidian
+
+  SIDELOADING FOR TESTING (no server needed):
+    1. Run: npx office-addin-dev-certs install   (installs a trusted localhost cert)
+    2. Serve this folder: npx http-server -S -C cert.pem -K key.pem -p 3000
+    3. Replace YOUR-HOST with localhost:3000 below
+    4. Sideload via Outlook → File → Options → Trust Center → Trusted Add-in Catalogs
+       OR use https://aka.ms/sideload-apps-for-office
+
+  PRODUCTION DEPLOYMENT (Microsoft 365 admin):
+    Upload this manifest.xml at admin.microsoft.com → Settings → Integrated apps
+-->
+<OfficeApp
+  xmlns="http://schemas.microsoft.com/office/appforoffice/1.1"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0"
+  xmlns:mailappor="http://schemas.microsoft.com/office/mailappversionoverrides/1.0"
+  xsi:type="MailApp">
+
+  <!-- Unique add-in identifier — do NOT change after deployment -->
+  <Id>4b7f2d1e-8a3c-4e5f-9b6d-0c1a2b3d4e5f</Id>
+  <Version>2.0.0.0</Version>
+  <ProviderName>Syntax Systems Ltd</ProviderName>
+  <DefaultLocale>en-US</DefaultLocale>
+
+  <DisplayName DefaultValue="Outlook to Obsidian"/>
+  <Description DefaultValue="Extract meeting details from a calendar appointment and create a formatted Obsidian note."/>
+
+  <IconUrl DefaultValue="https://YOUR-HOST/outlook-to-obsidian/icon128.png"/>
+  <HighResolutionIconUrl DefaultValue="https://YOUR-HOST/outlook-to-obsidian/icon128.png"/>
+  <SupportUrl DefaultValue="https://github.com/"/>
+
+  <AppDomains>
+    <!-- Add any additional domains you use for OAuth or resources here -->
+  </AppDomains>
+
+  <Hosts>
+    <Host Name="Mailbox"/>
+  </Hosts>
+
+  <Requirements>
+    <Sets>
+      <!-- Mailbox 1.5 required for makeEwsRequestAsync on all platforms -->
+      <Set Name="Mailbox" MinVersion="1.5"/>
+    </Sets>
+  </Requirements>
+
+  <!-- Legacy FormSettings: task pane shown when opening an appointment -->
+  <FormSettings>
+    <Form xsi:type="ItemRead">
+      <DesktopSettings>
+        <SourceLocation DefaultValue="https://YOUR-HOST/outlook-to-obsidian/taskpane.html"/>
+        <RequestedHeight>600</RequestedHeight>
+      </DesktopSettings>
+    </Form>
+    <Form xsi:type="ItemEdit">
+      <DesktopSettings>
+        <SourceLocation DefaultValue="https://YOUR-HOST/outlook-to-obsidian/taskpane.html"/>
+        <RequestedHeight>600</RequestedHeight>
+      </DesktopSettings>
+    </Form>
+  </FormSettings>
+
+  <!--
+    ReadWriteMailbox: required to call makeEwsRequestAsync (used to fetch
+    attendee RSVP status).  If your deployment policy does not allow this,
+    change to ReadItem — RSVP status will then be unavailable and all
+    attendees will appear under "No Response".
+  -->
+  <Permissions>ReadWriteMailbox</Permissions>
+
+  <!-- Show on calendar appointments (read & compose) -->
+  <Rule xsi:type="RuleCollection" Mode="Or">
+    <Rule xsi:type="ItemIs" ItemType="Appointment" FormType="Read"/>
+    <Rule xsi:type="ItemIs" ItemType="Appointment" FormType="Edit"/>
+  </Rule>
+
+  <!-- VersionOverrides: ribbon button in modern Outlook -->
+  <VersionOverrides
+    xmlns="http://schemas.microsoft.com/office/mailappversionoverrides"
+    xsi:type="VersionOverridesV1_0">
+
+    <Requirements>
+      <bt:Sets DefaultMinVersion="1.5">
+        <bt:Set Name="Mailbox"/>
+      </bt:Sets>
+    </Requirements>
+
+    <Hosts>
+      <Host xsi:type="MailHost">
+        <DesktopFormFactor>
+
+          <!-- Required even when no function-only commands are used -->
+          <FunctionFile resid="Commands.Url"/>
+
+          <!-- Attendee view: reading a meeting you were invited to -->
+          <ExtensionPoint xsi:type="AppointmentAttendeeCommandSurface">
+            <OfficeTab id="TabDefault">
+              <Group id="obsidianGroupAttendee">
+                <Label resid="Group.Label"/>
+                <Icon>
+                  <bt:Image size="16" resid="Icon.16"/>
+                  <bt:Image size="32" resid="Icon.32"/>
+                  <bt:Image size="80" resid="Icon.80"/>
+                </Icon>
+                <Control xsi:type="Button" id="obsidianBtnAttendee">
+                  <Label resid="Button.Label"/>
+                  <Supertip>
+                    <Title resid="Button.Label"/>
+                    <Description resid="Button.Tooltip"/>
+                  </Supertip>
+                  <Icon>
+                    <bt:Image size="16" resid="Icon.16"/>
+                    <bt:Image size="32" resid="Icon.32"/>
+                    <bt:Image size="80" resid="Icon.80"/>
+                  </Icon>
+                  <Action xsi:type="ShowTaskpane">
+                    <TaskpaneId>ObsidianPane</TaskpaneId>
+                    <SourceLocation resid="Taskpane.Url"/>
+                  </Action>
+                </Control>
+              </Group>
+            </OfficeTab>
+          </ExtensionPoint>
+
+          <!-- Organizer view: composing / editing a meeting you own -->
+          <ExtensionPoint xsi:type="AppointmentOrganizerCommandSurface">
+            <OfficeTab id="TabDefault">
+              <Group id="obsidianGroupOrganizer">
+                <Label resid="Group.Label"/>
+                <Icon>
+                  <bt:Image size="16" resid="Icon.16"/>
+                  <bt:Image size="32" resid="Icon.32"/>
+                  <bt:Image size="80" resid="Icon.80"/>
+                </Icon>
+                <Control xsi:type="Button" id="obsidianBtnOrganizer">
+                  <Label resid="Button.Label"/>
+                  <Supertip>
+                    <Title resid="Button.Label"/>
+                    <Description resid="Button.Tooltip"/>
+                  </Supertip>
+                  <Icon>
+                    <bt:Image size="16" resid="Icon.16"/>
+                    <bt:Image size="32" resid="Icon.32"/>
+                    <bt:Image size="80" resid="Icon.80"/>
+                  </Icon>
+                  <Action xsi:type="ShowTaskpane">
+                    <TaskpaneId>ObsidianPane</TaskpaneId>
+                    <SourceLocation resid="Taskpane.Url"/>
+                  </Action>
+                </Control>
+              </Group>
+            </OfficeTab>
+          </ExtensionPoint>
+
+        </DesktopFormFactor>
+      </Host>
+    </Hosts>
+
+    <Resources>
+      <bt:Images>
+        <bt:Image id="Icon.16"  DefaultValue="https://YOUR-HOST/outlook-to-obsidian/icon16.png"/>
+        <bt:Image id="Icon.32"  DefaultValue="https://YOUR-HOST/outlook-to-obsidian/icon48.png"/>
+        <bt:Image id="Icon.80"  DefaultValue="https://YOUR-HOST/outlook-to-obsidian/icon128.png"/>
+      </bt:Images>
+      <bt:Urls>
+        <bt:Url id="Taskpane.Url"  DefaultValue="https://YOUR-HOST/outlook-to-obsidian/taskpane.html"/>
+        <bt:Url id="Commands.Url"  DefaultValue="https://YOUR-HOST/outlook-to-obsidian/commands.html"/>
+      </bt:Urls>
+      <bt:ShortStrings>
+        <bt:String id="Group.Label"   DefaultValue="Obsidian"/>
+        <bt:String id="Button.Label"  DefaultValue="Create Note"/>
+      </bt:ShortStrings>
+      <bt:LongStrings>
+        <bt:String id="Button.Tooltip" DefaultValue="Extract meeting details and create an Obsidian note"/>
+      </bt:LongStrings>
+    </Resources>
+
+  </VersionOverrides>
+</OfficeApp>

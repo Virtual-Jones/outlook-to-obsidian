@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8"/>
+  <!--
+    commands.html — Office Add-in function file
+    ════════════════════════════════════════════
+    This file is required by the manifest's <FunctionFile> element.
+    It loads Office.js and serves as the execution context for any
+    "function command" buttons (UI-less commands that run JavaScript
+    directly without opening a task pane).
+
+    This add-in currently uses only task pane commands, so this file
+    contains no custom logic — it simply satisfies the manifest
+    requirement.  Add Office.actions.associate() calls here if you
+    later add UI-less ribbon commands.
+  -->
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js" type="text/javascript"></script>
+  <script type="text/javascript">
+    Office.onReady(() => {
+      // No function commands defined — task pane only.
+    });
+  </script>
+</head>
+<body></body>
+</html>
