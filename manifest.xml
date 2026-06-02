@@ -73,7 +73,7 @@
     change to ReadItem — RSVP status will then be unavailable and all
     attendees will appear under "No Response".
   -->
-  <Permissions>ReadWriteMailbox</Permissions>
+  <Permissions>ReadItem</Permissions>
 
   <!-- Show on calendar appointments (read & compose) -->
   <Rule xsi:type="RuleCollection" Mode="Or">
