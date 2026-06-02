@@ -2,7 +2,7 @@
 <!--
   Outlook to Obsidian — Office Add-in Manifest
   =============================================
-  BEFORE DEPLOYING: replace every occurrence of https://YOUR-HOST/outlook-to-obsidian
+  BEFORE DEPLOYING: replace every occurrence of https://virtualjones.github.io/outlook-to-obsidian
   with the URL where you are hosting these files (e.g. GitHub Pages):
     https://<your-github-username>.github.io/outlook-to-obsidian
 
@@ -32,8 +32,8 @@
   <DisplayName DefaultValue="Outlook to Obsidian"/>
   <Description DefaultValue="Extract meeting details from a calendar appointment and create a formatted Obsidian note."/>
 
-  <IconUrl DefaultValue="https://YOUR-HOST/outlook-to-obsidian/icon128.png"/>
-  <HighResolutionIconUrl DefaultValue="https://YOUR-HOST/outlook-to-obsidian/icon128.png"/>
+  <IconUrl DefaultValue="https://virtualjones.github.io/outlook-to-obsidian/icon128.png"/>
+  <HighResolutionIconUrl DefaultValue="https://virtualjones.github.io/outlook-to-obsidian/icon128.png"/>
   <SupportUrl DefaultValue="https://github.com/"/>
 
   <AppDomains>
@@ -55,13 +55,13 @@
   <FormSettings>
     <Form xsi:type="ItemRead">
       <DesktopSettings>
-        <SourceLocation DefaultValue="https://YOUR-HOST/outlook-to-obsidian/taskpane.html"/>
+        <SourceLocation DefaultValue="https://virtualjones.github.io/outlook-to-obsidian/taskpane.html"/>
         <RequestedHeight>600</RequestedHeight>
       </DesktopSettings>
     </Form>
     <Form xsi:type="ItemEdit">
       <DesktopSettings>
-        <SourceLocation DefaultValue="https://YOUR-HOST/outlook-to-obsidian/taskpane.html"/>
+        <SourceLocation DefaultValue="https://virtualjones.github.io/outlook-to-obsidian/taskpane.html"/>
         <RequestedHeight>600</RequestedHeight>
       </DesktopSettings>
     </Form>
@@ -165,13 +165,13 @@
 
     <Resources>
       <bt:Images>
-        <bt:Image id="Icon.16"  DefaultValue="https://YOUR-HOST/outlook-to-obsidian/icon16.png"/>
-        <bt:Image id="Icon.32"  DefaultValue="https://YOUR-HOST/outlook-to-obsidian/icon48.png"/>
-        <bt:Image id="Icon.80"  DefaultValue="https://YOUR-HOST/outlook-to-obsidian/icon128.png"/>
+        <bt:Image id="Icon.16"  DefaultValue="https://virtualjones.github.io/outlook-to-obsidian/icon16.png"/>
+        <bt:Image id="Icon.32"  DefaultValue="https://virtualjones.github.io/outlook-to-obsidian/icon48.png"/>
+        <bt:Image id="Icon.80"  DefaultValue="https://virtualjones.github.io/outlook-to-obsidian/icon128.png"/>
       </bt:Images>
       <bt:Urls>
-        <bt:Url id="Taskpane.Url"  DefaultValue="https://YOUR-HOST/outlook-to-obsidian/taskpane.html"/>
-        <bt:Url id="Commands.Url"  DefaultValue="https://YOUR-HOST/outlook-to-obsidian/commands.html"/>
+        <bt:Url id="Taskpane.Url"  DefaultValue="https://virtualjones.github.io/outlook-to-obsidian/taskpane.html"/>
+        <bt:Url id="Commands.Url"  DefaultValue="https://virtualjones.github.io/outlook-to-obsidian/commands.html"/>
       </bt:Urls>
       <bt:ShortStrings>
         <bt:String id="Group.Label"   DefaultValue="Obsidian"/>
