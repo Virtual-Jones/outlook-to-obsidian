@@ -1,7 +1,10 @@
 {
   "permissions": {
     "allow": [
-      "WebFetch(domain:outlook.cloud.microsoft)"
+      "WebFetch(domain:outlook.cloud.microsoft)",
+      "Bash(npx --yes office-addin-manifest validate manifest.xml)",
+      "PowerShell(npx --yes office-addin-manifest validate manifest.xml 2>&1)",
+      "PowerShell([guid]::NewGuid\\(\\).ToString\\(\\))"
     ]
   }
 }

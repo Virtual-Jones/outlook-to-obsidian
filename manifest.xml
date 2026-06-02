@@ -24,7 +24,7 @@
   xsi:type="MailApp">
 
   <!-- Unique add-in identifier — do NOT change after deployment -->
-  <Id>4b7f2d1e-8a3c-4e5f-9b6d-0c1a2b3d4e5f</Id>
+  <Id>55267e54-b786-4113-a715-5b864213fa0b</Id>
   <Version>2.0.0.0</Version>
   <ProviderName>Syntax Systems Ltd</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
@@ -35,10 +35,6 @@
   <IconUrl DefaultValue="https://virtualjones.github.io/outlook-to-obsidian/icon128.png"/>
   <HighResolutionIconUrl DefaultValue="https://virtualjones.github.io/outlook-to-obsidian/icon128.png"/>
   <SupportUrl DefaultValue="https://github.com/"/>
-
-  <AppDomains>
-    <!-- Add any additional domains you use for OAuth or resources here -->
-  </AppDomains>
 
   <Hosts>
     <Host Name="Mailbox"/>
