@@ -558,7 +558,13 @@ function getAttendeesViaEws(itemId) {
 
     Office.context.mailbox.makeEwsRequestAsync(soap, result => {
       if (result.status !== Office.AsyncResultStatus.Succeeded) {
-        reject(new Error(result.error?.message || 'EWS request failed'));
+        const err  = result.error || {};
+        const code = err.code != null ? ` code=${err.code}` : '';
+        const name = err.name ? ` name=${err.name}` : '';
+        const body = typeof result.value === 'string' && result.value.length > 0
+          ? ' body=' + result.value.replace(/\s+/g, ' ').slice(0, 400)
+          : '';
+        reject(new Error((err.message || 'EWS request failed') + code + name + body));
         return;
       }
       try {
