@@ -329,8 +329,8 @@ async function extractMeetingDetails() {
     try {
       attendeesByStatus = await getAttendeesViaEws(item.itemId);
     } catch (ewsErr) {
-      // EWS unavailable or failed — fall back to Office.js (no RSVP info)
       console.warn('EWS attendee fetch failed, using Office.js fallback:', ewsErr.message);
+      showStatus('RSVP unavailable (' + ewsErr.message + ') — names only.', 'info');
       attendeesByStatus = await getAttendeesViaOfficeJs(item);
     }
   } else {
@@ -510,6 +510,21 @@ function getAttendeesViaOfficeJs(item) {
 function getAttendeesViaEws(itemId) {
   return new Promise((resolve, reject) => {
 
+    // In New Outlook on Windows (and some Outlook on the web configurations)
+    // item.itemId is REST-formatted. EWS requires the EWS-formatted ID.
+    // convertToEwsId is a no-op when the ID is already EWS-formatted in
+    // recent Outlook builds, but we guard with try/catch defensively.
+    let ewsId = itemId;
+    try {
+      const converted = Office.context.mailbox.convertToEwsId(
+        itemId,
+        Office.MailboxEnums.RestVersion.v2_0
+      );
+      if (converted) ewsId = converted;
+    } catch (_) {
+      // Already EWS format, or conversion unavailable — use as-is.
+    }
+
     const soap = `<?xml version="1.0" encoding="UTF-8"?>
 <soap:Envelope
   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -530,7 +545,7 @@ function getAttendeesViaEws(itemId) {
         </t:AdditionalProperties>
       </m:ItemShape>
       <m:ItemIds>
-        <t:ItemId Id="${itemId}"/>
+        <t:ItemId Id="${ewsId}"/>
       </m:ItemIds>
     </m:GetItem>
   </soap:Body>
