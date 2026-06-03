@@ -160,7 +160,11 @@ async function onExtract() {
     }
 
     renderDetails(extractedData);
-    showStatus('Meeting details extracted successfully.', 'success');
+    if (extractedData.ewsErrorMessage) {
+      showStatus('Extracted OK. RSVP unavailable — EWS error: ' + extractedData.ewsErrorMessage, 'info');
+    } else {
+      showStatus('Meeting details extracted successfully.', 'success');
+    }
 
     if (settings.copyToClipboard) await copyText(extractedData.note);
 
@@ -325,12 +329,13 @@ async function extractMeetingDetails() {
     'No Response': new Map(),
   };
 
+  let ewsErrorMessage = '';
   if (isReadMode && item.itemId) {
     try {
       attendeesByStatus = await getAttendeesViaEws(item.itemId);
     } catch (ewsErr) {
       console.warn('EWS attendee fetch failed, using Office.js fallback:', ewsErr.message);
-      showStatus('RSVP unavailable (' + ewsErr.message + ') — names only.', 'info');
+      ewsErrorMessage = ewsErr.message || 'unknown';
       attendeesByStatus = await getAttendeesViaOfficeJs(item);
     }
   } else {
@@ -416,7 +421,7 @@ async function extractMeetingDetails() {
   const note      = noteLines.filter(l => l !== null).join('\r\n');
   const safeTitle = title.replace(/[<>:"/\\|?*]/g, '-');
 
-  return { title, time, location, totalAttendees, hasExternalAttendees, meetingDate, safeTitle, note };
+  return { title, time, location, totalAttendees, hasExternalAttendees, meetingDate, safeTitle, note, ewsErrorMessage };
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
