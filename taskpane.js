@@ -465,8 +465,13 @@ function getBodyText(item) {
 }
 
 /**
- * Fallback attendee extraction using the Office.js object model.
- * Provides name and email but NOT RSVP status (all marked "No Response").
+ * Attendee extraction using the Office.js object model.
+ *
+ * For meetings the current user organizes (read mode), each
+ * EmailAddressDetails entry exposes appointmentResponse — the attendee's
+ * RSVP. When that's populated we bucket attendees accordingly. When it
+ * isn't (e.g. attendee-side view of someone else's meeting, or compose
+ * mode), everyone falls into "No Response".
  */
 function getAttendeesViaOfficeJs(item) {
   return new Promise(async resolve => {
@@ -475,6 +480,15 @@ function getAttendeesViaOfficeJs(item) {
       'Tentative':   new Map(),
       'Declined':    new Map(),
       'No Response': new Map(),
+    };
+
+    // Office.MailboxEnums.ResponseType → bucket
+    const RESPONSE_MAP = {
+      'accepted':   'Accepted',
+      'tentative':  'Tentative',
+      'declined':   'Declined',
+      'none':       'No Response',
+      'organizer':  null,        // skip — captured via item.organizer
     };
 
     async function fetchList(prop) {
@@ -497,7 +511,12 @@ function getAttendeesViaOfficeJs(item) {
     for (const a of [...required, ...optional]) {
       const name  = a.displayName || a.emailAddress || '';
       const email = (a.emailAddress || '').toLowerCase();
-      if (name) result['No Response'].set(name, email);
+      if (!name) continue;
+
+      const rt = (a.appointmentResponse || 'none').toString().toLowerCase();
+      const bucket = RESPONSE_MAP.hasOwnProperty(rt) ? RESPONSE_MAP[rt] : 'No Response';
+      if (bucket === null) continue;
+      result[bucket].set(name, email);
     }
 
     resolve(result);
