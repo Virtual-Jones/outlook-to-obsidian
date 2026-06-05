@@ -160,11 +160,7 @@ async function onExtract() {
     }
 
     renderDetails(extractedData);
-    if (extractedData.ewsErrorMessage) {
-      showStatus('Extracted OK. RSVP unavailable — EWS error: ' + extractedData.ewsErrorMessage, 'info');
-    } else {
-      showStatus('Meeting details extracted successfully.', 'success');
-    }
+    showStatus('Meeting details extracted successfully.', 'success');
 
     if (settings.copyToClipboard) await copyText(extractedData.note);
 
