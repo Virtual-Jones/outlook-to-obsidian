@@ -375,8 +375,8 @@ async function extractMeetingDetails() {
     organizerEmail = (item.organizer.emailAddress || '').toLowerCase();
   }
 
-  /* ── Body / Description ───────────────────────────────────────────────── */
-  const body = await getBodyText(item);
+  /* ── Body / Description (HTML → Markdown) ─────────────────────────────── */
+  const body = await getBodyMarkdown(item);
 
   /* ── Attendees with RSVP ──────────────────────────────────────────────── */
   let attendeesByStatus = {
@@ -521,8 +521,8 @@ async function extractEmailDetails() {
   const toFormatted = toList.map(formatPerson).filter(Boolean);
   const ccFormatted = ccList.map(formatPerson).filter(Boolean);
 
-  /* ── Body ─────────────────────────────────────────────────────────────── */
-  const body = await getBodyText(item);
+  /* ── Body (HTML → Markdown) ───────────────────────────────────────────── */
+  const body = await getBodyMarkdown(item);
 
   /* ── External detection ───────────────────────────────────────────────── */
   const internalSuffix = '@' + (settings.internalDomain || 'syntax.com')
@@ -632,6 +632,74 @@ function getBodyText(item) {
       resolve(result.status === Office.AsyncResultStatus.Succeeded ? result.value || '' : '');
     });
   });
+}
+
+/**
+ * Get the body as Markdown. Pulls HTML (line breaks survive HTML coercion in
+ * New Outlook where plain-text coercion collapses them), strips Outlook-
+ * specific cruft, then runs Turndown. Falls back to plain text if Turndown
+ * is unavailable or HTML retrieval fails.
+ */
+function getBodyMarkdown(item) {
+  return new Promise(resolve => {
+    if (!item.body) { resolve(''); return; }
+
+    item.body.getAsync(Office.CoercionType.Html, result => {
+      if (result.status !== Office.AsyncResultStatus.Succeeded || !result.value) {
+        getBodyText(item).then(resolve);
+        return;
+      }
+
+      const html = cleanOutlookHtml(result.value);
+
+      if (typeof TurndownService === 'undefined') {
+        // CDN blocked or still loading — fall back to a sanitized text dump.
+        const tmp = document.createElement('div');
+        tmp.innerHTML = html;
+        resolve((tmp.textContent || '').trim());
+        return;
+      }
+
+      try {
+        const td = new TurndownService({
+          headingStyle:     'atx',
+          bulletListMarker: '-',
+          codeBlockStyle:   'fenced',
+          emDelimiter:      '*',
+        });
+
+        // Drop embedded inline images (cid: refs aren't useful in the note).
+        td.addRule('strip-cid-images', {
+          filter: node => node.nodeName === 'IMG' &&
+            (node.getAttribute('src') || '').toLowerCase().startsWith('cid:'),
+          replacement: (_c, node) => {
+            const alt = node.getAttribute('alt');
+            return alt ? `*[${alt}]*` : '';
+          },
+        });
+
+        const md = td.turndown(html)
+          .replace(/ /g, ' ')      // non-breaking spaces → regular space
+          .replace(/\n{3,}/g, '\n\n')    // collapse runs of blank lines
+          .trim();
+
+        resolve(md);
+      } catch (e) {
+        console.warn('Turndown conversion failed, using text fallback:', e.message);
+        getBodyText(item).then(resolve);
+      }
+    });
+  });
+}
+
+/** Strip Office/Outlook-specific HTML cruft that confuses converters. */
+function cleanOutlookHtml(html) {
+  return html
+    .replace(/<!--\[if[^>]*?\]>[\s\S]*?<!\[endif\]-->/gi, '')   // MSO conditional comments
+    .replace(/<o:p[^>]*>[\s\S]*?<\/o:p>/gi, '')                 // <o:p>...</o:p>
+    .replace(/<o:p[^>]*\/>/gi, '')                              // <o:p/>
+    .replace(/<\/?(?:meta|link|style)\b[^>]*>/gi, '')           // strip head leftovers
+    .replace(/<style[\s\S]*?<\/style>/gi, '');                  // and any inline <style>
 }
 
 /**
