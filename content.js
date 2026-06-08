@@ -4,7 +4,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     sendResponse({status: 'ready'});
     return true;
   }
-  
+
   if (request.action === 'extractMeeting') {
     extractMeetingDetails().then(sendResponse);
     return true; // Keep the message channel open for async response
@@ -13,240 +13,415 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
 async function extractMeetingDetails() {
   try {
-    /* TITLE/SUBJECT */
+
+    /* ── TITLE / SUBJECT ────────────────────────────────────────────────
+     * Priority: ARIA-labelled inputs (edit view) → heading in event panel
+     * (read view) → Fluent UI text in panel → legacy hashed class names
+     * ─────────────────────────────────────────────────────────────────── */
     let title = '';
-    let titleSelectors = [
-      'span.CWGkB',
-      'div.FZzLA span',
-      'span[class*="CWGkB"]',
-      'div[class*="FZzLA"] span',
+
+    // Edit / compose view: the subject field is usually a labelled input
+    const titleInputSelectors = [
+      'input[aria-label="Subject"]',
       'input[aria-label*="subject" i]',
-      'input[placeholder*="subject" i]'
+      'input[aria-label*="title" i]',
+      'div[role="textbox"][aria-label*="subject" i]',
+      'textarea[aria-label*="subject" i]',
+      'input[placeholder*="subject" i]',
+      'input[placeholder*="title" i]',
     ];
-    
-    for (let selector of titleSelectors) {
+    for (const sel of titleInputSelectors) {
       try {
-        let element = document.querySelector(selector);
-        if (element) {
-          let text = element.value || element.textContent;
-          if (text && text.trim()) {
-            title = text.trim();
-            break;
-          }
+        const el = document.querySelector(sel);
+        if (el) {
+          const text = (el.value || el.textContent || '').trim();
+          if (text) { title = text; break; }
         }
-      } catch(e) {}
+      } catch (_) {}
     }
-    
-    if (!title) title = 'Untitled Meeting';
-    
-    /* DATE/TIME */
-    let time = '';
-    let meetingDate = null;
-    let timeSelectors = [
-      'div.y79CD',
-      'div[class*="y79CD"]',
-      'button[aria-label*="Start time" i]',
-      'input[aria-label*="start" i][aria-label*="time" i]'
-    ];
-    
-    for (let selector of timeSelectors) {
-      let element = document.querySelector(selector);
-      if (element) {
-        let text = element.value || element.getAttribute('aria-label') || element.textContent;
-        if (text && text.trim()) {
-          text = text.trim();
-          if (text.length < 200 && !text.match(/SMTWTFS/)) {
-            time = text;
-            
-            let dateMatch = text.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-            if (dateMatch) {
-              let month = dateMatch[1].padStart(2, '0');
-              let day = dateMatch[2].padStart(2, '0');
-              let year = dateMatch[3];
-              meetingDate = {
-                year: year,
-                month: month,
-                day: day,
-                full: `${year}-${month}-${day}`
-              };
-            }
-            break;
+
+    // Read view: prominent heading inside the event panel / dialog
+    if (!title) {
+      const panelSel = [
+        '[role="dialog"]',
+        '[role="complementary"]',
+        '[data-app-section="eventPanel"]',
+        '[class*="eventPanel" i]',
+        '[class*="EventPanel"]',
+        '[class*="event-details" i]',
+      ].join(',');
+      const panel = document.querySelector(panelSel);
+      if (panel) {
+        for (const lvl of [
+          'h1',
+          'h2',
+          '[role="heading"][aria-level="1"]',
+          '[role="heading"][aria-level="2"]',
+          '[role="heading"]',
+        ]) {
+          const h = panel.querySelector(lvl);
+          if (h) {
+            const text = (h.textContent || '').trim();
+            if (text && text.length < 300) { title = text; break; }
           }
         }
       }
     }
-    
-    if (!meetingDate) {
-      let today = new Date();
-      meetingDate = {
-        year: today.getFullYear().toString(),
-        month: (today.getMonth() + 1).toString().padStart(2, '0'),
-        day: today.getDate().toString().padStart(2, '0'),
-        full: today.toISOString().split('T')[0]
-      };
+
+    // Legacy hashed class names — kept as last resort
+    if (!title) {
+      for (const sel of [
+        'span.CWGkB',
+        'div.FZzLA span',
+        'span[class*="CWGkB"]',
+        'div[class*="FZzLA"] span',
+      ]) {
+        try {
+          const el = document.querySelector(sel);
+          if (el) {
+            const text = (el.value || el.textContent || '').trim();
+            if (text) { title = text; break; }
+          }
+        } catch (_) {}
+      }
     }
-    
-    /* LOCATION */
-    let location = '';
-    let locationSelectors = [
-      'input[aria-label*="location" i]',
-      'button[aria-label*="location" i]',
-      'div[aria-label*="location" i]:not([class*="calendar"])',
-      'span[class*="location" i]:not([class*="calendar"])',
-      'input[placeholder*="location" i]'
+
+    if (!title) title = 'Untitled Meeting';
+
+    /* ── DATE / TIME ────────────────────────────────────────────────────
+     * Priority: ARIA-labelled date/time inputs or buttons → <time> element
+     * → legacy hashed class names
+     * ─────────────────────────────────────────────────────────────────── */
+    let time = '';
+    let meetingDate = null;
+
+    const timeSelectors = [
+      'input[aria-label="Start date"]',
+      'input[aria-label*="start date" i]',
+      'button[aria-label*="start date" i]',
+      'input[aria-label*="start time" i]',
+      'button[aria-label*="start time" i]',
+      'input[aria-label*="Start" i]',
+      'button[aria-label*="Start" i]',
+      // Legacy
+      'div.y79CD',
+      'div[class*="y79CD"]',
     ];
-    
-    for (let selector of locationSelectors) {
-      let element = document.querySelector(selector);
-      if (element) {
-        let text = element.value || element.textContent;
-        if (text) {
-          location = text.replace(/^Location\s*/i, '').trim();
+
+    for (const sel of timeSelectors) {
+      const el = document.querySelector(sel);
+      if (el) {
+        const text = (el.value || el.getAttribute('aria-label') || el.textContent || '').trim();
+        if (text && text.length < 200 && !text.match(/SMTWTFS/)) {
+          time = text;
           break;
         }
       }
     }
-    
-    /* ORGANIZER */
-    let organizer = '';
-    let organizerEmail = '';
-    let organizerElement = document.querySelector('div.lpxUr.EKtKK span.fui-Persona__primaryText');
-    if (!organizerElement) {
-      organizerElement = document.querySelector('div[class*="EKtKK"] span[class*="Persona__primaryText"]');
+
+    // Fallback: <time datetime="…"> element
+    if (!time) {
+      const timeEl = document.querySelector('time[datetime]');
+      if (timeEl) {
+        time = (timeEl.textContent || timeEl.getAttribute('datetime') || '').trim();
+      }
     }
-    if (organizerElement) {
-      organizer = organizerElement.textContent.trim();
-      let parentElement = organizerElement.closest('div.lpxUr.EKtKK') || organizerElement.closest('span[aria-label]');
-      if (parentElement) {
-        let ariaLabel = parentElement.getAttribute('aria-label') || '';
-        let emailMatch = ariaLabel.match(/[\w\.-]+@[\w\.-]+\.\w+/);
-        if (emailMatch) {
-          organizerEmail = emailMatch[0].toLowerCase();
+
+    // Parse date from whatever time string we captured
+    if (time) {
+      // MM/DD/YYYY
+      let m = time.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+      if (m) {
+        meetingDate = {
+          year: m[3],
+          month: m[1].padStart(2, '0'),
+          day: m[2].padStart(2, '0'),
+          full: `${m[3]}-${m[1].padStart(2, '0')}-${m[2].padStart(2, '0')}`,
+        };
+      }
+      // YYYY-MM-DD (ISO / datetime attribute)
+      if (!meetingDate) {
+        m = time.match(/(\d{4})-(\d{2})-(\d{2})/);
+        if (m) {
+          meetingDate = { year: m[1], month: m[2], day: m[3], full: `${m[1]}-${m[2]}-${m[3]}` };
+        }
+      }
+      // D Month YYYY  (e.g. "15 April 2026")
+      if (!meetingDate) {
+        m = time.match(/(\d{1,2})\s+(\w+)\s+(\d{4})/);
+        if (m) {
+          const months = { january:'01',february:'02',march:'03',april:'04',may:'05',june:'06',
+                           july:'07',august:'08',september:'09',october:'10',november:'11',december:'12' };
+          const mo = months[m[2].toLowerCase()];
+          if (mo) {
+            meetingDate = {
+              year: m[3],
+              month: mo,
+              day: m[1].padStart(2, '0'),
+              full: `${m[3]}-${mo}-${m[1].padStart(2, '0')}`,
+            };
+          }
         }
       }
     }
-    
-    /* MEETING BODY */
-    let body = '';
-    let bodySelectors = [
-      'div[role="textbox"][aria-label*="message" i]',
-      'div[role="textbox"][contenteditable="true"]',
-      'div[class*="body"][class*="content"]',
-      'div[aria-label*="description" i]',
-      'div[aria-label*="Message body"]'
+
+    if (!meetingDate) {
+      const today = new Date();
+      meetingDate = {
+        year: today.getFullYear().toString(),
+        month: (today.getMonth() + 1).toString().padStart(2, '0'),
+        day: today.getDate().toString().padStart(2, '0'),
+        full: today.toISOString().split('T')[0],
+      };
+    }
+
+    /* ── LOCATION ────────────────────────────────────────────────────── */
+    let location = '';
+    const locationSelectors = [
+      'input[aria-label="Location"]',
+      'input[aria-label*="location" i]',
+      'button[aria-label*="location" i]',
+      'div[role="textbox"][aria-label*="location" i]',
+      'div[aria-label*="location" i]:not([class*="calendar"])',
+      'span[aria-label*="location" i]:not([class*="calendar"])',
+      'input[placeholder*="location" i]',
     ];
-    
-    for (let selector of bodySelectors) {
-      let element = document.querySelector(selector);
-      if (element) {
-        body = element.innerText || element.textContent;
-        if (body) break;
+
+    for (const sel of locationSelectors) {
+      const el = document.querySelector(sel);
+      if (el) {
+        const text = (el.value || el.textContent || '').replace(/^Location\s*/i, '').trim();
+        if (text) { location = text; break; }
       }
     }
-    
-    /* ATTENDEES WITH SCROLLING */
-    let attendeesByStatus = {
+
+    /* ── ORGANIZER ───────────────────────────────────────────────────── */
+    let organizer = '';
+    let organizerEmail = '';
+
+    // Helper: extract first email address found in an element's ARIA labels or title attrs
+    function extractEmail(el) {
+      let anc = el;
+      while (anc && anc !== document.body) {
+        const label = anc.getAttribute('aria-label') || '';
+        const m = label.match(/[\w.\-+]+@[\w.-]+\.\w+/);
+        if (m) return m[0].toLowerCase();
+        anc = anc.parentElement;
+      }
+      for (const t of el.querySelectorAll('[title]')) {
+        const tv = t.getAttribute('title') || '';
+        if (tv.includes('@')) {
+          const m = tv.match(/[\w.\-+]+@[\w.-]+\.\w+/);
+          if (m) return m[0].toLowerCase();
+        }
+      }
+      const dataEmail = el.getAttribute('data-email') || '';
+      return dataEmail ? dataEmail.toLowerCase() : '';
+    }
+
+    // Try to find organizer: look for a persona inside an "organizer" labelled region
+    const organizerEl =
+      document.querySelector('[aria-label*="organizer" i] [class*="Persona__primaryText"]') ||
+      document.querySelector('[aria-label*="organizer" i] [class*="fui-Persona"]') ||
+      // Legacy hashed classes
+      document.querySelector('div.lpxUr.EKtKK span.fui-Persona__primaryText') ||
+      document.querySelector('div[class*="EKtKK"] span[class*="Persona__primaryText"]');
+
+    if (organizerEl) {
+      organizer = organizerEl.textContent.trim();
+      const emailHost = organizerEl.closest('[aria-label]') || organizerEl.closest('[title]');
+      if (emailHost) {
+        const label = emailHost.getAttribute('aria-label') || emailHost.getAttribute('title') || '';
+        const m = label.match(/[\w.\-+]+@[\w.-]+\.\w+/);
+        if (m) organizerEmail = m[0].toLowerCase();
+      }
+      if (!organizerEmail) organizerEmail = extractEmail(organizerEl.closest('div') || organizerEl);
+    }
+
+    /* ── MEETING BODY / DESCRIPTION ─────────────────────────────────── */
+    let body = '';
+    const bodySelectors = [
+      'div[aria-label="Message body"][role="textbox"]',
+      'div[role="textbox"][aria-label*="message body" i]',
+      'div[aria-label*="description" i][role="textbox"]',
+      'div[role="textbox"][aria-label*="description" i]',
+      '[aria-label*="Message body"]',
+      '[aria-label*="description" i]',
+      'div[role="textbox"][contenteditable="true"]',
+      'div[class*="body"][class*="content"]',
+    ];
+
+    for (const sel of bodySelectors) {
+      const el = document.querySelector(sel);
+      if (el) {
+        const text = (el.innerText || el.textContent || '').trim();
+        if (text) { body = text; break; }
+      }
+    }
+
+    /* ── ATTENDEES WITH RSVP GROUPING ────────────────────────────────── */
+    const attendeesByStatus = {
       'Accepted': new Map(),
       'Tentative': new Map(),
       'Declined': new Map(),
-      'No Response': new Map()
+      'No Response': new Map(),
     };
-    
     let hasExternalAttendees = false;
-    
-    /* Find scrollable container */
+    const processedNames = new Set();
+
+    // Map text → RSVP status bucket
+    function getRSVPStatus(text) {
+      const t = (text || '').toLowerCase();
+      if (t.includes('accepted')) return 'Accepted';
+      if (t.includes('tentative')) return 'Tentative';
+      if (t.includes('declined')) return 'Declined';
+      if (t.includes('no response') || t.includes('no-response') || t.includes('awaiting')) return 'No Response';
+      return null;
+    }
+
+    // Add a persona element to the right bucket
+    function processPersona(el, status) {
+      // The name lives inside a Persona__primaryText span (Fluent UI, stable prefix)
+      const nameEl =
+        el.querySelector('[class*="Persona__primaryText"]') ||
+        el.querySelector('[class*="persona-primary" i]');
+      if (!nameEl) return;
+
+      const name = nameEl.textContent.trim();
+      if (!name || processedNames.has(name)) return;
+
+      const email = extractEmail(el);
+      if (email && !email.endsWith('@syntax.com')) hasExternalAttendees = true;
+
+      attendeesByStatus[status].set(name, email);
+      processedNames.add(name);
+    }
+
+    /* Find the scrollable attendee container.
+     * Strategy (in order):
+     *  1. role="tree"  — Outlook renders the RSVP list as an ARIA tree
+     *  2. role="list" / aria-label*="attendee"
+     *  3. Walk up from the first Persona__primaryText element until we find
+     *     an overflow:auto/scroll ancestor
+     *  4. Legacy: any overflow div that contains div.lpxUr
+     */
     let scrollContainer = null;
-    let possibleContainers = [
-      document.querySelector('div[role="tree"]'),
-      document.querySelector('div[class*="scrollable"]'),
-      ...Array.from(document.querySelectorAll('div')).filter(el => {
-        let style = window.getComputedStyle(el);
-        return (style.overflowY === 'auto' || style.overflowY === 'scroll') && 
-               el.querySelector('div.lpxUr');
-      })
+
+    const containerCandidates = [
+      document.querySelector('[role="tree"]'),
+      document.querySelector('[aria-label*="attendee" i][role="list"]'),
+      document.querySelector('[role="list"][aria-label*="attendee" i]'),
+      document.querySelector('[aria-label*="attendee" i]'),
     ].filter(Boolean);
-    
-    for (let container of possibleContainers) {
-      if (container && container.scrollHeight > container.clientHeight) {
-        scrollContainer = container;
+
+    if (containerCandidates.length === 0) {
+      // Walk up from first visible persona element
+      const firstPersona = document.querySelector('[class*="Persona__primaryText"]');
+      if (firstPersona) {
+        let anc = firstPersona.parentElement;
+        while (anc && anc !== document.body) {
+          const s = window.getComputedStyle(anc);
+          if ((s.overflowY === 'auto' || s.overflowY === 'scroll') && anc.scrollHeight > anc.clientHeight) {
+            containerCandidates.push(anc);
+            break;
+          }
+          anc = anc.parentElement;
+        }
+      }
+    }
+
+    if (containerCandidates.length === 0) {
+      // Legacy fallback: any scrollable div with div.lpxUr inside
+      for (const div of document.querySelectorAll('div')) {
+        const s = window.getComputedStyle(div);
+        if ((s.overflowY === 'auto' || s.overflowY === 'scroll') && div.querySelector('div.lpxUr')) {
+          containerCandidates.push(div);
+          break;
+        }
+      }
+    }
+
+    for (const c of containerCandidates) {
+      if (c && c.scrollHeight >= c.clientHeight) {
+        scrollContainer = c;
         break;
       }
     }
-    
-    let currentRSVPStatus = 'No Response';
-    let processedNames = new Set();
-    
+    if (!scrollContainer && containerCandidates.length > 0) {
+      scrollContainer = containerCandidates[0];
+    }
+
+    /* Process attendees from the currently-visible portion of the list.
+     *
+     * Element classification (in DOM order):
+     *  • RSVP header  → element whose trimmed text is a short RSVP label
+     *                    AND that does NOT itself contain a Persona span
+     *  • Attendee row → element that DOES contain a Persona__primaryText span
+     *
+     * We also accept ARIA tree / list roles as structural signals.
+     */
+    function processAttendeeRoot(root) {
+      let currentStatus = 'No Response';
+
+      // Build a flat ordered list of relevant nodes
+      const candidates = root.querySelectorAll([
+        // ARIA structural roles
+        '[role="treeitem"]',
+        '[role="listitem"]',
+        '[role="group"]',
+        '[role="heading"]',
+        // Fluent UI Persona rows (new Outlook)
+        '[class*="Persona__primaryText"]',
+        // Legacy hashed rows
+        'div.ELl7R.TqkD6',
+        'div.lpxUr.VCV1f.sKKBX',
+        'div.lpxUr',
+      ].join(','));
+
+      for (const el of candidates) {
+        // Is this a group / heading acting as an RSVP section header?
+        const isGroupOrHeading =
+          el.getAttribute('role') === 'group' ||
+          el.getAttribute('role') === 'heading' ||
+          el.classList.contains('ELl7R');
+
+        if (isGroupOrHeading) {
+          const status = getRSVPStatus(el.textContent);
+          if (status) { currentStatus = status; }
+          continue;
+        }
+
+        // Does it contain a persona name but is NOT itself just a name span?
+        const hasPersona = !!el.querySelector('[class*="Persona__primaryText"]');
+        const isPersonaSpan = el.matches('[class*="Persona__primaryText"]');
+
+        if (hasPersona && !isPersonaSpan) {
+          processPersona(el, currentStatus);
+          continue;
+        }
+
+        // Short element whose text is purely an RSVP label (section header without role)
+        const trimmed = el.textContent.trim();
+        if (!hasPersona && !isPersonaSpan && trimmed.length < 60) {
+          const status = getRSVPStatus(trimmed);
+          if (status) { currentStatus = status; }
+        }
+      }
+    }
+
     if (scrollContainer) {
       scrollContainer.scrollTop = 0;
-      await new Promise(resolve => setTimeout(resolve, 200));
-      
+      await new Promise(r => setTimeout(r, 200));
+
       let lastCount = 0;
-      let totalCount = 0;
       let noChangeCount = 0;
       let scrollAttempts = 0;
       const maxScrollAttempts = 50;
-      
+
       while (scrollAttempts < maxScrollAttempts) {
-        let allVisibleElements = scrollContainer.querySelectorAll('div.ELl7R.TqkD6, div.lpxUr.VCV1f.sKKBX');
-        
-        allVisibleElements.forEach(element => {
-          if (element.classList.contains('ELl7R')) {
-            let headerText = element.textContent || element.getAttribute('aria-label') || '';
-            
-            if (headerText.toLowerCase().includes('accepted')) {
-              currentRSVPStatus = 'Accepted';
-            } else if (headerText.toLowerCase().includes('tentative')) {
-              currentRSVPStatus = 'Tentative';
-            } else if (headerText.toLowerCase().includes('declined')) {
-              currentRSVPStatus = 'Declined';
-            } else if (headerText.toLowerCase().includes('no response') || headerText.toLowerCase().includes('no-response')) {
-              currentRSVPStatus = 'No Response';
-            }
-          } else if (element.classList.contains('lpxUr')) {
-            let nameElement = element.querySelector('span.fui-Persona__primaryText, span[class*="Persona__primaryText"]');
-            
-            if (nameElement) {
-              let name = nameElement.textContent.trim();
-              
-              if (name && name.length > 0 && !processedNames.has(name)) {
-                let email = '';
-                
-                let parentSpan = element.closest('span[aria-label]');
-                if (parentSpan) {
-                  let ariaLabel = parentSpan.getAttribute('aria-label') || '';
-                  let emailMatch = ariaLabel.match(/[\w\.-]+@[\w\.-]+\.\w+/);
-                  if (emailMatch) {
-                    email = emailMatch[0].toLowerCase();
-                  }
-                }
-                
-                if (!email) {
-                  let elementsWithTitle = element.querySelectorAll('[title]');
-                  for (let titleEl of elementsWithTitle) {
-                    let titleText = titleEl.getAttribute('title');
-                    if (titleText && titleText.includes('@')) {
-                      let emailMatch = titleText.match(/[\w\.-]+@[\w\.-]+\.\w+/);
-                      if (emailMatch) {
-                        email = emailMatch[0].toLowerCase();
-                        break;
-                      }
-                    }
-                  }
-                }
-                
-                if (email && !email.endsWith('@syntax.com')) {
-                  hasExternalAttendees = true;
-                }
-                
-                attendeesByStatus[currentRSVPStatus].set(name, email);
-                processedNames.add(name);
-              }
-            }
-          }
-        });
-        
-        totalCount = processedNames.size;
-        
+        processAttendeeRoot(scrollContainer);
+
+        const totalCount = processedNames.size;
         if (totalCount === lastCount) {
           noChangeCount++;
           if (noChangeCount > 3) break;
@@ -254,100 +429,52 @@ async function extractMeetingDetails() {
           noChangeCount = 0;
           lastCount = totalCount;
         }
-        
-        let previousScrollTop = scrollContainer.scrollTop;
+
+        const prevScrollTop = scrollContainer.scrollTop;
         scrollContainer.scrollTop += scrollContainer.clientHeight * 0.8;
-        
-        await new Promise(resolve => setTimeout(resolve, 300));
-        
-        if (scrollContainer.scrollTop === previousScrollTop) break;
-        
+        await new Promise(r => setTimeout(r, 300));
+
+        if (scrollContainer.scrollTop === prevScrollTop) break;
         scrollAttempts++;
       }
-      
+
       scrollContainer.scrollTop = 0;
     } else {
-      // Process visible elements without scrolling
-      let allElements = document.querySelectorAll('div.ELl7R.TqkD6, div.lpxUr.VCV1f.sKKBX');
-      
-      allElements.forEach(element => {
-        if (element.classList.contains('ELl7R')) {
-          let headerText = element.textContent || element.getAttribute('aria-label') || '';
-          
-          if (headerText.toLowerCase().includes('accepted')) {
-            currentRSVPStatus = 'Accepted';
-          } else if (headerText.toLowerCase().includes('tentative')) {
-            currentRSVPStatus = 'Tentative';
-          } else if (headerText.toLowerCase().includes('declined')) {
-            currentRSVPStatus = 'Declined';
-          } else if (headerText.toLowerCase().includes('no response')) {
-            currentRSVPStatus = 'No Response';
-          }
-        } else if (element.classList.contains('lpxUr')) {
-          let nameElement = element.querySelector('span.fui-Persona__primaryText, span[class*="Persona__primaryText"]');
-          
-          if (nameElement) {
-            let name = nameElement.textContent.trim();
-            if (name && name.length > 0) {
-              let email = '';
-              let parentSpan = element.closest('span[aria-label]');
-              if (parentSpan) {
-                let ariaLabel = parentSpan.getAttribute('aria-label') || '';
-                let emailMatch = ariaLabel.match(/[\w\.-]+@[\w\.-]+\.\w+/);
-                if (emailMatch) {
-                  email = emailMatch[0].toLowerCase();
-                  if (!email.endsWith('@syntax.com')) {
-                    hasExternalAttendees = true;
-                  }
-                }
-              }
-              attendeesByStatus[currentRSVPStatus].set(name, email);
-            }
-          }
-        }
-      });
+      // No dedicated container — scan the whole document
+      processAttendeeRoot(document.body);
     }
-    
+
     if (organizerEmail && !organizerEmail.endsWith('@syntax.com')) {
       hasExternalAttendees = true;
     }
-    
-    /* Format the note */
-    let acceptedAttendeesList = Array.from(attendeesByStatus['Accepted'].keys()).sort();
-    if (organizer) {
-      acceptedAttendeesList.unshift(organizer);
-    }
-    
-    let attendeesFormatted = [];
-    let totalAttendees = (organizer ? 1 : 0);
-    
-    if (organizer) {
-      attendeesFormatted.push(`**Organizer:** ${organizer}`);
-    }
-    
-    let statusOrder = ['Accepted', 'Tentative', 'No Response', 'Declined'];
-    
-    for (let status of statusOrder) {
-      let attendeeList = Array.from(attendeesByStatus[status].keys()).sort();
-      if (attendeeList.length > 0) {
-        totalAttendees += attendeeList.length;
-        attendeesFormatted.push(`**${status} (${attendeeList.length}):** ${attendeeList.join(', ')}`);
+
+    /* ── FORMAT NOTE ─────────────────────────────────────────────────── */
+    const acceptedAttendeesList = Array.from(attendeesByStatus['Accepted'].keys()).sort();
+    if (organizer) acceptedAttendeesList.unshift(organizer);
+
+    const attendeesFormatted = [];
+    let totalAttendees = organizer ? 1 : 0;
+
+    if (organizer) attendeesFormatted.push(`**Organizer:** ${organizer}`);
+
+    for (const status of ['Accepted', 'Tentative', 'No Response', 'Declined']) {
+      const list = Array.from(attendeesByStatus[status].keys()).sort();
+      if (list.length > 0) {
+        totalAttendees += list.length;
+        attendeesFormatted.push(`**${status} (${list.length}):** ${list.join(', ')}`);
       }
     }
-    
-    let attendeesStr = attendeesFormatted.join('\n\n');
-    if (!attendeesStr) {
-      attendeesStr = 'No attendees found';
-    }
-    
-    let noteLines = [
+
+    const attendeesStr = attendeesFormatted.join('\n\n') || 'No attendees found';
+
+    const noteLines = [
       '---',
       'tags: meeting',
       `date: ${meetingDate.full}`,
       'type: outlook-meeting',
       `external: ${hasExternalAttendees}`,
-      `attendees: [${acceptedAttendeesList.map(name => `"${name}"`).join(', ')}]`,
-	  'summary: ',
+      `attendees: [${acceptedAttendeesList.map(n => `"${n}"`).join(', ')}]`,
+      'summary: ',
       '---',
       '',
       `# ${title}`,
@@ -356,7 +483,7 @@ async function extractMeetingDetails() {
       `**Date/Time:** ${time || 'Not specified'}`,
       location ? `**Location:** ${location}` : '',
       `**Total Attendees:** ${totalAttendees}`,
-      hasExternalAttendees ? `**External Meeting:** Yes` : '',
+      hasExternalAttendees ? '**External Meeting:** Yes' : '',
       '',
       '### Attendees by RSVP Status',
       attendeesStr,
@@ -372,31 +499,18 @@ async function extractMeetingDetails() {
       '',
       '## Follow-up',
       '',
-      ''
+      '',
     ];
-    
-    let note = noteLines.filter(line => line !== null).join('\r\n');
-    
-    let safeTitle = title.replace(/[<>:"/\\|?*]/g, '-');
-    
+
+    const note = noteLines.filter(line => line !== null).join('\r\n');
+    const safeTitle = title.replace(/[<>:"/\\|?*]/g, '-');
+
     return {
       success: true,
-      data: {
-        title: title,
-        time: time,
-        location: location,
-        totalAttendees: totalAttendees,
-        hasExternalAttendees: hasExternalAttendees,
-        meetingDate: meetingDate,
-        safeTitle: safeTitle,
-        note: note
-      }
+      data: { title, time, location, totalAttendees, hasExternalAttendees, meetingDate, safeTitle, note },
     };
-    
+
   } catch (error) {
-    return {
-      success: false,
-      error: error.message
-    };
+    return { success: false, error: error.message };
   }
 }
