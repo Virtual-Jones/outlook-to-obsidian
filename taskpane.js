@@ -16,6 +16,7 @@
 const DEFAULT_SETTINGS = {
   vaultName:       'Syntax',
   folderPath:      '02. Meeting Notes',
+  emailFolderPath: '04. Email Notes',
   internalDomain:  'syntax.com',
   copyToClipboard: true,
   includeExternal: false,
@@ -28,7 +29,33 @@ let extractedData = null;
 Office.onReady(() => {
   loadSettings();
   bindUI();
+  applyContextLabels();
 });
+
+/* Returns 'message' or 'meeting' based on the current Outlook item. */
+function getCurrentItemType() {
+  try {
+    const t = Office.context.mailbox.item?.itemType;
+    return t === Office.MailboxEnums.ItemType.Message ? 'message' : 'meeting';
+  } catch (_) {
+    return 'meeting';
+  }
+}
+
+/* Update button label and header to match the current context (message vs meeting). */
+function applyContextLabels() {
+  const isMessage = getCurrentItemType() === 'message';
+  const btn = document.getElementById('extractBtn');
+  if (btn) {
+    btn.innerHTML = isMessage
+      ? '<span>📧</span><span>Extract Email Details</span>'
+      : '<span>📅</span><span>Extract Meeting Details</span>';
+  }
+  const headerIcon = document.getElementById('headerIcon');
+  if (headerIcon) headerIcon.textContent = isMessage ? '📧' : '📅';
+  const headerTitle = document.getElementById('headerTitle');
+  if (headerTitle) headerTitle.textContent = isMessage ? 'Send Email to Obsidian' : 'Send Meeting to Obsidian';
+}
 
 /* ── UI binding ──────────────────────────────────────────────────────────── */
 function bindUI() {
@@ -86,15 +113,18 @@ function loadSettings() {
 
 /* ── Settings — save ─────────────────────────────────────────────────────── */
 function onSaveSettings() {
-  const vaultName      = document.getElementById('vaultName').value.trim();
-  const folderPath     = document.getElementById('folderPath').value.trim();
-  const internalDomain = document.getElementById('internalDomain').value.trim();
+  const vaultName       = document.getElementById('vaultName').value.trim();
+  const folderPath      = document.getElementById('folderPath').value.trim();
+  const emailFolderPath = document.getElementById('emailFolderPath').value.trim();
+  const internalDomain  = document.getElementById('internalDomain').value.trim();
 
-  if (!vaultName)  { showStatus('Please enter a vault name.', 'error'); return; }
-  if (!folderPath) { showStatus('Please enter a folder path.', 'error'); return; }
+  if (!vaultName)       { showStatus('Please enter a vault name.', 'error'); return; }
+  if (!folderPath)      { showStatus('Please enter a meeting notes folder.', 'error'); return; }
+  if (!emailFolderPath) { showStatus('Please enter an email notes folder.', 'error'); return; }
 
   settings.vaultName       = vaultName;
   settings.folderPath      = folderPath;
+  settings.emailFolderPath = emailFolderPath;
   settings.internalDomain  = internalDomain || DEFAULT_SETTINGS.internalDomain;
   settings.copyToClipboard = document.getElementById('copyToClipboard').checked;
   settings.includeExternal = document.getElementById('includeExternal').checked;
@@ -117,18 +147,21 @@ function onSaveSettings() {
 }
 
 function populateSettingsForm() {
-  document.getElementById('vaultName').value       = settings.vaultName;
-  document.getElementById('folderPath').value      = settings.folderPath;
-  document.getElementById('internalDomain').value  = settings.internalDomain;
+  document.getElementById('vaultName').value         = settings.vaultName;
+  document.getElementById('folderPath').value        = settings.folderPath;
+  document.getElementById('emailFolderPath').value   = settings.emailFolderPath;
+  document.getElementById('internalDomain').value    = settings.internalDomain;
   document.getElementById('copyToClipboard').checked = settings.copyToClipboard;
   document.getElementById('includeExternal').checked = settings.includeExternal;
 }
 
 function updateConfigDisplay() {
-  const ok = !!(settings.vaultName && settings.folderPath);
+  const isMessage = getCurrentItemType() === 'message';
+  const activePath = isMessage ? settings.emailFolderPath : settings.folderPath;
+  const ok = !!(settings.vaultName && activePath);
   document.getElementById('configWarning').style.display = ok ? 'none' : 'block';
   document.getElementById('vaultDisplay').textContent    = settings.vaultName  || 'Not set';
-  document.getElementById('pathDisplay').textContent     = settings.folderPath || 'Not set';
+  document.getElementById('pathDisplay').textContent     = activePath || 'Not set';
   document.getElementById('extractBtn').disabled = !ok;
 }
 
@@ -148,10 +181,14 @@ async function onExtract() {
   btn.disabled = true;
   document.getElementById('details').style.display = 'none';
   document.getElementById('actions').style.display = 'none';
-  showStatus('Extracting meeting details…', 'info');
+
+  const isMessage = getCurrentItemType() === 'message';
+  showStatus(isMessage ? 'Extracting email…' : 'Extracting meeting details…', 'info');
 
   try {
-    extractedData = await extractMeetingDetails();
+    extractedData = isMessage
+      ? await extractEmailDetails()
+      : await extractMeetingDetails();
 
     // Apply [EXTERNAL] prefix when configured
     if (settings.includeExternal && extractedData.hasExternalAttendees) {
@@ -160,7 +197,7 @@ async function onExtract() {
     }
 
     renderDetails(extractedData);
-    showStatus('Meeting details extracted successfully.', 'success');
+    showStatus(isMessage ? 'Email extracted successfully.' : 'Meeting details extracted successfully.', 'success');
 
     if (settings.copyToClipboard) await copyText(extractedData.note);
 
@@ -175,30 +212,53 @@ async function onExtract() {
 
 function renderDetails(data) {
   const truncate = (s, n) => s.length > n ? s.substring(0, n) + '…' : s;
-  document.getElementById('details').innerHTML = `
+  const isEmail = data.kind === 'email';
+
+  const rows = [];
+
+  rows.push(`
     <div class="detail-row">
-      <span class="detail-label">Title</span>
+      <span class="detail-label">${isEmail ? 'Subject' : 'Title'}</span>
       <span class="detail-value">${esc(truncate(data.title, 60))}</span>
-    </div>
+    </div>`);
+
+  if (isEmail) {
+    rows.push(`
     <div class="detail-row">
-      <span class="detail-label">Date/Time</span>
+      <span class="detail-label">From</span>
+      <span class="detail-value">${esc(truncate(data.fromName || '', 50))}</span>
+    </div>`);
+  }
+
+  rows.push(`
+    <div class="detail-row">
+      <span class="detail-label">${isEmail ? 'Sent' : 'Date/Time'}</span>
       <span class="detail-value">${esc(data.time || 'Not specified')}</span>
-    </div>
-    ${data.location ? `
+    </div>`);
+
+  if (!isEmail && data.location) {
+    rows.push(`
     <div class="detail-row">
       <span class="detail-label">Location</span>
       <span class="detail-value">${esc(truncate(data.location, 50))}</span>
-    </div>` : ''}
+    </div>`);
+  }
+
+  rows.push(`
     <div class="detail-row">
-      <span class="detail-label">Attendees</span>
+      <span class="detail-label">${isEmail ? 'Recipients' : 'Attendees'}</span>
       <span class="detail-value">${data.totalAttendees}</span>
-    </div>
-    ${data.hasExternalAttendees ? `
+    </div>`);
+
+  if (data.hasExternalAttendees) {
+    rows.push(`
     <div class="detail-row">
       <span class="detail-label">External</span>
       <span class="detail-value external">Yes</span>
-    </div>` : ''}
-  `;
+    </div>`);
+  }
+
+  document.getElementById('details').innerHTML = rows.join('');
 }
 
 /* ── Open in Obsidian ────────────────────────────────────────────────────── */
@@ -213,9 +273,10 @@ function onOpenObsidian() {
 }
 
 function buildObsidianUri(data) {
-  const folder   = `${settings.folderPath}/${data.meetingDate.year}/${data.meetingDate.month}`;
+  const basePath  = data.kind === 'email' ? settings.emailFolderPath : settings.folderPath;
+  const folder    = `${basePath}/${data.meetingDate.year}/${data.meetingDate.month}`;
   const safeTitle = data.title.replace(/[<>:"/\\|?*]/g, '-');
-  const file     = `${folder}/${data.meetingDate.full} ${safeTitle}`;
+  const file      = `${folder}/${data.meetingDate.full} ${safeTitle}`;
   return `obsidian://new?vault=${encodeURIComponent(settings.vaultName)}&file=${encodeURIComponent(file)}&content=${encodeURIComponent(data.note)}`;
 }
 
@@ -417,7 +478,120 @@ async function extractMeetingDetails() {
   const note      = noteLines.filter(l => l !== null).join('\r\n');
   const safeTitle = title.replace(/[<>:"/\\|?*]/g, '-');
 
-  return { title, time, location, totalAttendees, hasExternalAttendees, meetingDate, safeTitle, note, ewsErrorMessage };
+  return { kind: 'meeting', title, time, location, totalAttendees, hasExternalAttendees, meetingDate, safeTitle, note, ewsErrorMessage };
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   CORE EXTRACTION — Email (Message read mode)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+async function extractEmailDetails() {
+  const item = Office.context.mailbox.item;
+
+  /* ── Subject ──────────────────────────────────────────────────────────── */
+  const title = (await getItemProperty(item.subject)) || 'No Subject';
+
+  /* ── Sent date — prefer dateTimeCreated, fall back to dateTimeModified ─── */
+  const sentDate = (item.dateTimeCreated instanceof Date && !isNaN(item.dateTimeCreated))
+    ? item.dateTimeCreated
+    : (item.dateTimeModified instanceof Date ? item.dateTimeModified : new Date());
+
+  const y  = sentDate.getFullYear();
+  const mo = String(sentDate.getMonth() + 1).padStart(2, '0');
+  const d  = String(sentDate.getDate()).padStart(2, '0');
+  const meetingDate = { year: String(y), month: mo, day: d, full: `${y}-${mo}-${d}` };
+
+  const time = `${sentDate.toLocaleDateString()} ${sentDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+
+  /* ── From / Sender ────────────────────────────────────────────────────── */
+  const fromObj    = item.from || item.sender || {};
+  const fromName   = fromObj.displayName || fromObj.emailAddress || '';
+  const fromEmail  = (fromObj.emailAddress || '').toLowerCase();
+
+  /* ── To / Cc ──────────────────────────────────────────────────────────── */
+  const toList = Array.isArray(item.to) ? item.to : [];
+  const ccList = Array.isArray(item.cc) ? item.cc : [];
+
+  function formatPerson(p) {
+    const name  = p.displayName || p.emailAddress || '';
+    const email = p.emailAddress || '';
+    return email && name !== email ? `${name} <${email}>` : name;
+  }
+
+  const toFormatted = toList.map(formatPerson).filter(Boolean);
+  const ccFormatted = ccList.map(formatPerson).filter(Boolean);
+
+  /* ── Body ─────────────────────────────────────────────────────────────── */
+  const body = await getBodyText(item);
+
+  /* ── External detection ───────────────────────────────────────────────── */
+  const internalSuffix = '@' + (settings.internalDomain || 'syntax.com')
+    .toLowerCase()
+    .replace(/^@/, '');
+
+  let hasExternalAttendees = !!(fromEmail && !fromEmail.endsWith(internalSuffix));
+  if (!hasExternalAttendees) {
+    for (const p of [...toList, ...ccList]) {
+      const e = (p.emailAddress || '').toLowerCase();
+      if (e && !e.endsWith(internalSuffix)) { hasExternalAttendees = true; break; }
+    }
+  }
+
+  const totalAttendees = toList.length + ccList.length;
+
+  /* ── Format note ──────────────────────────────────────────────────────── */
+  const fromLine = fromName
+    ? (fromEmail && fromName !== fromEmail ? `${fromName} <${fromEmail}>` : fromName)
+    : 'Unknown sender';
+
+  const noteLines = [
+    '---',
+    'tags: email',
+    `date: ${meetingDate.full}`,
+    'type: outlook-email',
+    `from: "${fromLine.replace(/"/g, '\\"')}"`,
+    `external: ${hasExternalAttendees}`,
+    'summary: ',
+    '---',
+    '',
+    `# ${title}`,
+    '',
+    '## Email Details',
+    `**From:** ${fromLine}`,
+    `**Sent:** ${time}`,
+    toFormatted.length ? `**To (${toFormatted.length}):** ${toFormatted.join(', ')}` : null,
+    ccFormatted.length ? `**Cc (${ccFormatted.length}):** ${ccFormatted.join(', ')}` : null,
+    hasExternalAttendees ? '**External Email:** Yes' : null,
+    '',
+    '### Body',
+    body.trim() || 'No body content',
+    '',
+    '## Notes',
+    '',
+    '',
+    '## Action Items',
+    '',
+    '',
+    '## Follow-up',
+    '',
+    '',
+  ];
+
+  const note      = noteLines.filter(l => l !== null).join('\r\n');
+  const safeTitle = title.replace(/[<>:"/\\|?*]/g, '-');
+
+  return {
+    kind: 'email',
+    title,
+    time,
+    fromName: fromLine,
+    location: '',
+    totalAttendees,
+    hasExternalAttendees,
+    meetingDate,
+    safeTitle,
+    note,
+  };
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════

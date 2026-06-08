@@ -261,8 +261,8 @@
 
   <div class="header">
     <div class="header-title">
-      <span>📅</span>
-      <span>Outlook to Obsidian</span>
+      <span id="headerIcon">📅</span>
+      <span id="headerTitle">Send to Obsidian</span>
     </div>
     <button class="icon-btn" id="settingsBtn" title="Settings">⚙️</button>
   </div>
@@ -340,6 +340,17 @@
         <button class="preset-btn" data-target="folderPath" data-value="Meeting Notes">Meeting Notes</button>
         <button class="preset-btn" data-target="folderPath" data-value="02. Meeting Notes">02. Meeting Notes</button>
         <button class="preset-btn" data-target="folderPath" data-value="Work/Meetings">Work/Meetings</button>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="emailFolderPath">Email Notes Folder</label>
+      <input type="text" id="emailFolderPath" placeholder="e.g. 04. Email Notes"/>
+      <div class="help-text">Used when extracting an email message.</div>
+      <div class="preset-row">
+        <button class="preset-btn" data-target="emailFolderPath" data-value="Email Notes">Email Notes</button>
+        <button class="preset-btn" data-target="emailFolderPath" data-value="04. Email Notes">04. Email Notes</button>
+        <button class="preset-btn" data-target="emailFolderPath" data-value="Work/Emails">Work/Emails</button>
       </div>
     </div>
 
