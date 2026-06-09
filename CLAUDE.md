@@ -163,13 +163,6 @@ Edit the `noteLines` array in `extractMeetingDetails()` in [taskpane.js](taskpan
 - Check `Office.context.mailbox.item` in the console to inspect the live meeting object
 - Check `result.error` in EWS callback for SOAP-level errors
 
-## Legacy Chrome Extension Files (archived, not active)
-The following files remain from the original Chrome extension but are no longer used:
-- `manifest.json` — Chrome MV3 manifest
-- `popup.html` / `popup.js` — Chrome extension popup
-- `content.js` — DOM scraper (replaced by Office.js API)
-- `options.html` / `options.js` — Chrome extension options page
-
 ## Critical Integration Points
 
 ### Office.js API Surface Used
