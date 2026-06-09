@@ -650,7 +650,9 @@ function getBodyMarkdown(item) {
         return;
       }
 
-      const html = promoteOutlookTableHeaders(cleanOutlookHtml(result.value));
+      const html = flattenTableCellBlocks(
+        promoteOutlookTableHeaders(cleanOutlookHtml(result.value))
+      );
 
       if (typeof TurndownService === 'undefined') {
         // CDN blocked or still loading — fall back to a sanitized text dump.
@@ -723,6 +725,28 @@ function promoteOutlookTableHeaders(html) {
       }
       while (td.firstChild) th.appendChild(td.firstChild);
       td.parentNode.replaceChild(th, td);
+    }
+  }
+
+  return wrapper.innerHTML;
+}
+
+/**
+ * Markdown tables require each cell on a single line. Outlook wraps cell
+ * content in <p>…</p> (and sometimes <div>), which Turndown converts to
+ * \n\n-padded paragraphs — breaking the row syntax. Unwrap any <p>/<div>
+ * inside table cells so their inline content survives intact.
+ */
+function flattenTableCellBlocks(html) {
+  const wrapper = document.createElement('div');
+  wrapper.innerHTML = html;
+
+  for (const cell of wrapper.querySelectorAll('td, th')) {
+    let block;
+    while ((block = cell.querySelector('p, div'))) {
+      const parent = block.parentNode;
+      while (block.firstChild) parent.insertBefore(block.firstChild, block);
+      parent.removeChild(block);
     }
   }
 
