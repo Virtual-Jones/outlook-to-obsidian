@@ -650,7 +650,7 @@ function getBodyMarkdown(item) {
         return;
       }
 
-      const html = cleanOutlookHtml(result.value);
+      const html = promoteOutlookTableHeaders(cleanOutlookHtml(result.value));
 
       if (typeof TurndownService === 'undefined') {
         // CDN blocked or still loading — fall back to a sanitized text dump.
@@ -695,6 +695,38 @@ function getBodyMarkdown(item) {
       }
     });
   });
+}
+
+/**
+ * Outlook tables don't use <th>/<thead> — the header row is just bolded
+ * <td>s. Turndown's GFM table rule only fires when the first row is a
+ * proper heading row, so we promote the first row's <td>s to <th>s
+ * whenever the table has no existing header cells.
+ */
+function promoteOutlookTableHeaders(html) {
+  const wrapper = document.createElement('div');
+  wrapper.innerHTML = html;
+
+  for (const table of wrapper.querySelectorAll('table')) {
+    if (table.querySelector('th') || table.querySelector('thead')) continue;
+
+    const firstRow = table.querySelector('tr');
+    if (!firstRow) continue;
+
+    const tdCells = Array.from(firstRow.children).filter(c => c.nodeName === 'TD');
+    if (tdCells.length === 0) continue;
+
+    for (const td of tdCells) {
+      const th = document.createElement('th');
+      for (const attr of Array.from(td.attributes)) {
+        th.setAttribute(attr.name, attr.value);
+      }
+      while (td.firstChild) th.appendChild(td.firstChild);
+      td.parentNode.replaceChild(th, td);
+    }
+  }
+
+  return wrapper.innerHTML;
 }
 
 /** Strip Office/Outlook-specific HTML cruft that confuses converters. */
