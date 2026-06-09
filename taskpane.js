@@ -668,6 +668,11 @@ function getBodyMarkdown(item) {
           emDelimiter:      '*',
         });
 
+        // GFM plugin: tables, strikethrough, task lists.
+        if (typeof turndownPluginGfm !== 'undefined') {
+          td.use(turndownPluginGfm.gfm);
+        }
+
         // Drop embedded inline images (cid: refs aren't useful in the note).
         td.addRule('strip-cid-images', {
           filter: node => node.nodeName === 'IMG' &&
