@@ -70,10 +70,11 @@
   -->
   <Permissions>ReadWriteMailbox</Permissions>
 
-  <!-- Show on calendar appointments (read & compose) -->
+  <!-- Show on calendar appointments (read & compose) and on read email messages -->
   <Rule xsi:type="RuleCollection" Mode="Or">
     <Rule xsi:type="ItemIs" ItemType="Appointment" FormType="Read"/>
     <Rule xsi:type="ItemIs" ItemType="Appointment" FormType="Edit"/>
+    <Rule xsi:type="ItemIs" ItemType="Message" FormType="Read"/>
   </Rule>
 
   <!-- VersionOverrides: ribbon button in modern Outlook -->
@@ -100,6 +101,30 @@
               <Group id="obsidianGroupAttendee">
                 <Label resid="Group.Label"/>
                 <Control xsi:type="Button" id="obsidianBtnAttendee">
+                  <Label resid="Button.Label"/>
+                  <Supertip>
+                    <Title resid="Button.Label"/>
+                    <Description resid="Button.Tooltip"/>
+                  </Supertip>
+                  <Icon>
+                    <bt:Image size="16" resid="Icon.16"/>
+                    <bt:Image size="32" resid="Icon.32"/>
+                    <bt:Image size="80" resid="Icon.80"/>
+                  </Icon>
+                  <Action xsi:type="ShowTaskpane">
+                    <SourceLocation resid="Taskpane.Url"/>
+                  </Action>
+                </Control>
+              </Group>
+            </OfficeTab>
+          </ExtensionPoint>
+
+          <!-- Read message: extracting an email to an Obsidian note -->
+          <ExtensionPoint xsi:type="MessageReadCommandSurface">
+            <OfficeTab id="TabDefault">
+              <Group id="obsidianGroupMessage">
+                <Label resid="Group.Label"/>
+                <Control xsi:type="Button" id="obsidianBtnMessage">
                   <Label resid="Button.Label"/>
                   <Supertip>
                     <Title resid="Button.Label"/>

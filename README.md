@@ -1,461 +1,220 @@
-# Outlook to Obsidian Meeting Notes
+# Send to Obsidian — Outlook Add-in
 
-A Chrome extension that extracts meeting details from Outlook Web and creates beautifully formatted notes in Obsidian with a single click.
+An Outlook Add-in that extracts the current calendar appointment or email message into a formatted Markdown note and opens it directly in Obsidian via the `obsidian://` URI scheme.
+
+Originally a Chrome extension, this is now a cross-platform **Office Add-in** that runs anywhere Outlook does: Outlook on the Web, New Outlook for Windows, Classic Outlook Desktop (Windows & Mac).
 
 ## Features
 
-- **One-Click Extraction** - Extract meeting title, date/time, location, attendees, and description
-- **Automatic Attendee Collection** - Scrolls through attendee lists to capture all participants with RSVP status
-- **Smart Organization** - Automatically organizes notes in `Year/Month` folder structure
-- **External Meeting Detection** - Identifies and flags meetings with external attendees
-- **RSVP Status Tracking** - Groups attendees by Accepted, Tentative, Declined, and No Response
-- **Clipboard Integration** - Optionally copies note to clipboard for quick pasting
-- **Direct Obsidian Integration** - Opens note directly in Obsidian via URI scheme
+- **One-click extraction** for either calendar appointments or email messages
+- **Auto-detects context** — the same task pane adapts based on whether you opened a meeting or an email
+- **Markdown body conversion** — email/meeting bodies converted from HTML to clean Markdown (tables, lists, blockquotes, links, formatting preserved)
+- **Folder routing** — meetings go to one folder, emails to another; year/month subfolders created automatically
+- **RSVP status** for meetings you organize (Accepted / Tentative / Declined / No Response)
+- **External attendee/sender detection** based on a configurable internal email domain
+- **Roaming settings** — preferences sync with your Microsoft 365 account across devices
+- **Direct Obsidian launch** via the `obsidian://new` URI handler
+
+## Architecture
+
+| File | Role |
+|---|---|
+| [manifest.xml](manifest.xml) | Office Add-in manifest — declares ribbon buttons and rules |
+| [taskpane.html](taskpane.html) | Task pane UI (main panel + settings panel) |
+| [taskpane.js](taskpane.js) | Extraction logic, settings, Markdown conversion, URI building |
+| [commands.html](commands.html) | Placeholder function file (required by manifest) |
+| `icon{16,48,128}.png` | Ribbon icons |
+
+External dependencies (loaded at runtime via CDN):
+
+- **[Office.js](https://appsforoffice.microsoft.com/lib/1/hosted/office.js)** — Outlook API
+- **[Turndown 7.2.0](https://github.com/mixmark-io/turndown)** — HTML → Markdown converter
+- **[@joplin/turndown-plugin-gfm](https://github.com/laurent22/joplin-turndown-plugin-gfm)** — GitHub-Flavored Markdown extensions (tables, strikethrough, task lists)
 
 ## Installation
 
-### From Source
+The add-in is hosted via **GitHub Pages** at `https://virtualjones.github.io/outlook-to-obsidian/` and sideloaded into Outlook by uploading the `manifest.xml` file.
 
-1. Clone or download this repository
-2. Open Chrome/Edge and navigate to `chrome://extensions/`
-3. Enable **Developer mode** (toggle in top-right)
-4. Click **Load unpacked**
-5. Select the extension directory
+### Per-user sideload
 
-### First-Time Setup
+1. Download [manifest.xml](manifest.xml) from this repo (or clone the repo).
+2. Open Outlook → **Get Add-ins** → **My add-ins** → **Custom Addins** → **Add a custom add-in → Add from file**.
+3. Select `manifest.xml` and accept the warning.
 
-1. Click the extension icon in your browser toolbar
-2. Click the settings (⚙️) button
-3. Configure:
-   - **Vault Name**: Your Obsidian vault name (case-sensitive)
-   - **Folder Path**: Base folder for meeting notes (e.g., `Meeting Notes` or `02. Meeting Notes`)
-   - **Options**: Choose auto-close, clipboard copy, and external highlighting preferences
-4. Click **Save Settings**
+Alternatively use [aka.ms/olksideload](https://aka.ms/olksideload) which routes you to the same dialog.
+
+### Org-wide deployment (admin)
+
+Upload `manifest.xml` at https://admin.microsoft.com → Settings → Integrated apps → Upload custom app.
+
+### Self-hosting
+
+If you fork this repo:
+
+1. Enable GitHub Pages on your fork (Settings → Pages → Deploy from `main` / root).
+2. Replace all `https://virtualjones.github.io/outlook-to-obsidian` URLs in `manifest.xml` with your own Pages URL.
+3. Generate a new GUID for the `<Id>` element (PowerShell: `[guid]::NewGuid()`).
+4. Sideload the updated manifest as above.
 
 ## Usage
 
-### Basic Workflow
+### Capturing a meeting
 
-1. Navigate to a meeting invitation in Outlook Web (outlook.office.com)
-2. Open the meeting to view its details
-3. Click the extension icon
-4. Click **Extract Meeting Details**
-5. Review the extracted information
-6. Click **Create in Obsidian**
+1. Open a calendar appointment.
+2. Click **Obsidian → Create Note** in the ribbon.
+3. Click **Extract Meeting Details** in the task pane.
+4. Click **Open in Obsidian** (or **Copy** to paste manually).
 
-The note will be created in: `VaultName/FolderPath/YYYY/MM/YYYY-MM-DD Title.md`
+Output location: `<Vault>/<MeetingNotesFolder>/YYYY/MM/YYYY-MM-DD <Title>.md`
 
-### Example Note Structure
+### Capturing an email
+
+1. Open an email message.
+2. Click **Obsidian → Create Note** in the ribbon.
+3. Click **Extract Email Details** in the task pane.
+4. Click **Open in Obsidian**.
+
+Output location: `<Vault>/<EmailNotesFolder>/YYYY/MM/YYYY-MM-DD <Subject>.md`
+
+## Note templates
+
+### Meeting note
 
 ```markdown
 ---
 tags: meeting
-date: 2025-01-21
+date: 2026-06-15
 type: outlook-meeting
 external: false
-attendees: ["John Doe", "Jane Smith", "Bob Johnson"]
+attendees: ["Alice Brown", "Bob Johnson"]
 summary:
 ---
 
 # Weekly Team Sync
 
 ## Meeting Details
-**Date/Time:** Tuesday, January 21, 2025, 2:00 PM - 3:00 PM
+**Date/Time:** 6/15/2026 14:00 – 15:00
 **Location:** Conference Room A
 **Total Attendees:** 8
-**External Meeting:** No
 
 ### Attendees by RSVP Status
-
-**Organizer:** John Doe
-
+**Organizer:** Mike Jones
 **Accepted (5):** Alice Brown, Bob Johnson, Carol White, David Lee, Emma Davis
-
 **Tentative (2):** Frank Miller, Grace Wilson
-
 **No Response (1):** Henry Taylor
 
 ### Meeting Description
-Discuss project milestones and upcoming deliverables for Q1.
+Discuss Q2 deliverables…
 
 ## Notes
 
+## Action Items
+
+## Follow-up
+```
+
+### Email note
+
+```markdown
+---
+tags: email
+date: 2026-06-15
+type: outlook-email
+from: "Luke Kremer <luke.kremer@syntax.com>"
+external: false
+summary:
+---
+
+# Re: Project Status
+
+## Email Details
+**From:** Luke Kremer <luke.kremer@syntax.com>
+**Sent:** 6/15/2026 09:42
+**To (3):** Leonardo De Araujo, Rebecca Murray, Sarah Abikhzir
+**Cc (1):** Antonella Costanzo
+
+### Body
+Body content converted from HTML to Markdown, with
+**bold**, *italic*, [links](https://example.com), tables,
+and reply chains as > blockquotes.
+
+## Notes
 
 ## Action Items
 
-
 ## Follow-up
-
 ```
 
-## Configuration Options
+## Settings
 
-### Vault Settings
+Open the task pane → ⚙️ in the top right. Settings roam with your Microsoft 365 account.
 
-| Setting | Description | Example |
-|---------|-------------|---------|
-| **Vault Name** | Exact name of your Obsidian vault | `Syntax`, `Work`, `Personal` |
-| **Folder Path** | Base directory for meetings | `Meeting Notes`, `02. Meeting Notes`, `Work/Meetings` |
+| Setting | Default | Description |
+|---|---|---|
+| Vault Name | `Syntax` | Case-sensitive Obsidian vault name |
+| Meeting Notes Folder | `02. Meeting Notes` | Base folder for meeting notes; `YYYY/MM` subfolders are added automatically |
+| Email Notes Folder | `04. Email Notes` | Base folder for email notes |
+| Internal Email Domain | `syntax.com` | Anyone with another domain is flagged as external |
+| Copy to clipboard | ✓ | Auto-copy the note after extracting |
+| Prefix `[EXTERNAL]` | ✗ | Prepend `[EXTERNAL]` to titles when external participants are present |
 
-### Behavior Options
+## Key implementation notes
 
-| Option | Default | Description |
-|--------|---------|-------------|
-| **Auto Close** | ✓ | Automatically closes popup after creating note |
-| **Copy to Clipboard** | ✓ | Always copies note content to clipboard |
-| **Highlight External** | ✗ | Adds `[EXTERNAL]` prefix to meetings with non-company attendees |
+### RSVP detection
 
-## How It Works
+Meeting RSVPs come from `EmailAddressDetails.appointmentResponse` on each attendee. This only populates when you're the **organizer** of the meeting. Attendees viewing someone else's meeting cannot see other attendees' responses.
 
-### Architecture
+(Historically the add-in used the EWS `GetItem` SOAP call for RSVPs, but Microsoft is retiring EWS for Exchange Online in October 2026 and most tenants already block it. The EWS code path remains as a fallback but is expected to fail with `GenericResponseError` on modern M365 tenants.)
 
-```
-┌─────────────┐          ┌──────────────┐          ┌──────────────┐
-│  Popup UI   │ ────────>│Content Script│ ────────>│ Outlook DOM  │
-│ (popup.js)  │ inject   │(content.js)  │ scrape   │              │
-└─────────────┘          └──────────────┘          └──────────────┘
-       │                         │
-       │                         │
-       ▼                         ▼
-┌─────────────┐          ┌──────────────┐
-│  Settings   │          │  Extraction  │
-│ (options.js)│          │   Engine     │
-└─────────────┘          └──────────────┘
-       │                         │
-       │                         │
-       ▼                         ▼
-┌─────────────────────────────────────────┐
-│         Obsidian URI Handler            │
-│  obsidian://new?vault=...&file=...      │
-└─────────────────────────────────────────┘
-```
+### HTML → Markdown body conversion
 
-### Data Flow
+Bodies are pulled as HTML (plain-text coercion collapses line breaks in New Outlook) and run through Turndown plus the GFM plugin. Outlook-specific cruft (`<o:p>`, MSO conditional comments, inline `<style>`, embedded `cid:` images) is stripped before conversion.
 
-1. **User Action**: User clicks "Extract Meeting Details" in popup
-2. **Script Injection**: Popup checks if content script is loaded, injects if needed
-3. **Message Passing**: Popup sends `extractMeeting` message to content script
-4. **DOM Scraping**: Content script:
-   - Extracts meeting metadata (title, date, location)
-   - Scrolls through attendee list to capture all participants
-   - Determines RSVP statuses and external attendees
-   - Formats data into markdown note structure
-5. **Response**: Content script returns JSON payload with extracted data
-6. **URI Construction**: Popup builds Obsidian URI with encoded note content
-7. **Obsidian Launch**: Browser opens `obsidian://` URI, creating note
+### Permissions
 
-### Extraction Process
+`ReadWriteMailbox` is requested in the manifest. The high-permission level was originally for EWS access; with EWS retired, `ReadItem` would now suffice, but the higher permission is harmless.
 
-#### Meeting Metadata
-- **Title**: Uses fallback selectors for Outlook's dynamic UI
-- **Date/Time**: Extracts from multiple possible locations, parses into ISO format
-- **Location**: Searches input fields and button labels
-- **Organizer**: Finds persona element with name and email
+### Read vs Compose mode
 
-#### Attendee Collection
-The extension employs a sophisticated scrolling mechanism:
-
-1. Locates scrollable container in Outlook's attendee list
-2. Scrolls incrementally (80% of viewport height per iteration)
-3. Processes visible elements after each scroll
-4. Tracks RSVP status headers (Accepted, Tentative, etc.)
-5. Extracts name and email for each attendee
-6. Deduplicates entries
-7. Stops when no new attendees found (max 50 scroll attempts)
-
-#### External Detection
-Attendees and organizers are checked against `@syntax.com` domain. Any other domain triggers the `external: true` flag.
-
-## File Structure
-
-```
-outlook-to-obsidian/
-├── manifest.json          # Extension configuration and permissions
-├── popup.html             # Extension popup interface
-├── popup.js               # Popup logic and orchestration
-├── options.html           # Settings page UI
-├── options.js             # Settings management
-├── content.js             # Outlook DOM scraper
-├── icon16.png             # Extension icon (16x16)
-├── icon48.png             # Extension icon (48x48)
-├── icon128.png            # Extension icon (128x128)
-├── README.md              # This file
-└── CLAUDE.md              # AI assistant instructions
-```
-
-## Code Overview
-
-### [manifest.json](manifest.json)
-Defines extension metadata, permissions, and content script registration.
-
-**Key Permissions:**
-- `activeTab` - Access current tab
-- `clipboardWrite` - Copy to clipboard
-- `storage` - Save user settings
-- `scripting` - Inject content script dynamically
-- `host_permissions` - Access Outlook domains
-
-### [popup.js](popup.js) (206 lines)
-Main orchestration logic for the extension.
-
-**Key Functions:**
-- `loadAndDisplaySettings()` - Loads saved configuration
-- `ensureContentScript(tabId)` - Injects content script if not present
-- `extractBtn.addEventListener()` - Handles extraction workflow
-- `createObsidianBtn.addEventListener()` - Builds and opens Obsidian URI
-- `copyToClipboard(text)` - Copies note to clipboard
-
-### [content.js](content.js) (402 lines)
-Core scraping engine that runs on Outlook Web pages.
-
-**Main Function:** `extractMeetingDetails()`
-
-**Extraction Steps:**
-1. Title extraction (lines 17-40)
-2. Date/time parsing (lines 42-87)
-3. Location detection (lines 89-108)
-4. Organizer identification (lines 110-127)
-5. Meeting body/description (lines 129-145)
-6. Attendee collection with scrolling (lines 147-309)
-7. External attendee detection (lines 311-313)
-8. Note formatting (lines 315-378)
-
-**Selector Strategy:**
-Uses arrays of fallback selectors to handle Outlook UI variations:
-```javascript
-let titleSelectors = [
-  'span.CWGkB',
-  'div.FZzLA span',
-  'span[class*="CWGkB"]',
-  // ... more fallbacks
-];
-```
-
-### [options.js](options.js) (109 lines)
-Settings page logic with storage management.
-
-**Key Features:**
-- Default settings definition
-- Preset buttons for common configurations
-- Live folder structure preview
-- Settings validation and save/reset
-
-**Default Settings:**
-```javascript
-{
-  vaultName: 'Syntax',
-  folderPath: '02. Meeting Notes',
-  autoClose: true,
-  copyToClipboard: true,
-  includeExternal: false
-}
-```
-
-## Development
-
-### Prerequisites
-- Chrome or Edge browser
-- Obsidian desktop app installed
-- Node.js (optional, for future build tooling)
-
-### Development Workflow
-
-1. Make changes to source files
-2. Go to `chrome://extensions`
-3. Click reload icon for this extension
-4. Refresh Outlook Web page
-5. Test via popup interface
-
-### Debugging
-
-**Content Script:**
-1. Open DevTools on Outlook Web page
-2. Check Console tab for content script logs
-3. Use Sources tab to set breakpoints in `content.js`
-
-**Popup:**
-1. Right-click extension icon → Inspect popup
-2. View console logs and debug `popup.js`
-
-**Extension Background:**
-1. Go to `chrome://extensions`
-2. Click "Inspect views" under extension
-
-### Testing Checklist
-
-- [ ] Extract meeting with all fields populated
-- [ ] Extract meeting with missing fields (no location, no body)
-- [ ] Extract meeting with 50+ attendees (scrolling test)
-- [ ] Extract meeting with external attendees
-- [ ] Extract meeting with various RSVP statuses
-- [ ] Verify Obsidian URI opens correctly
-- [ ] Test clipboard copy functionality
-- [ ] Verify folder structure (Year/Month)
-- [ ] Test settings save/load
-- [ ] Test on different Outlook UI variations
+Office.js exposes properties differently depending on whether you're reading a saved item or composing a new one. The `getItemProperty()` helper transparently handles both — see [CLAUDE.md](CLAUDE.md) for details.
 
 ## Troubleshooting
 
-### Extension Not Working
+### Sideload fails
 
-**Issue**: "Please navigate to an Outlook Web meeting invitation first"
-- **Solution**: Ensure you're on `outlook.office.com`, `outlook.office365.com`, or `outlook.live.com`
-- **Solution**: Make sure you've opened a specific meeting (not just calendar view)
+- Confirm the Pages URLs in `manifest.xml` are reachable in a browser (`/taskpane.html`, `/commands.html`, `/icon128.png`).
+- Remove any prior partial install under **My add-ins** before retrying.
+- Restart Outlook after removing.
 
-**Issue**: "Could not access the page. Please refresh and try again."
-- **Solution**: Refresh the Outlook page and try again
-- **Solution**: Reload the extension in `chrome://extensions`
+### "RSVPs all show as No Response"
 
-**Issue**: "Failed to extract meeting details"
-- **Solution**: Outlook's UI may have changed - selectors might need updating
-- **Solution**: Check console logs in DevTools for specific errors
+You're either:
+- Viewing a meeting you didn't organize (Microsoft platform limitation), or
+- The meeting genuinely has no responses yet.
 
-### Obsidian Not Opening
+### "Obsidian doesn't open"
 
-**Issue**: Clicking "Create in Obsidian" does nothing
-- **Solution**: Ensure Obsidian desktop app is installed
-- **Solution**: Verify vault name exactly matches (case-sensitive)
-- **Solution**: Check that folder path doesn't contain invalid characters
+- Obsidian desktop must be installed and the vault name must match exactly (case-sensitive).
+- Verify the vault is open at least once so it's registered with Obsidian's URI handler.
 
-**Issue**: Note created in wrong location
-- **Solution**: Verify folder path in settings
-- **Solution**: Check that year/month folders exist or can be created
+### Manifest validation
 
-### Missing Attendees
-
-**Issue**: Not all attendees extracted
-- **Solution**: The scrolling logic should handle this automatically
-- **Solution**: If persistent, check `maxScrollAttempts` in [content.js:187](content.js#L187)
-- **Solution**: Manually scroll down before extraction as a workaround
-
-### External Detection Not Working
-
-**Issue**: External attendees not flagged
-- **Solution**: Check if company domain matches hardcoded `@syntax.com` in [content.js:237](content.js#L237) and [content.js:299](content.js#L299)
-- **Solution**: Update domain check if using different email domain
-
-## Customization
-
-### Changing Note Template
-
-Edit the `noteLines` array in [content.js:343-376](content.js#L343-L376):
-
-```javascript
-let noteLines = [
-  '---',
-  'tags: meeting',
-  `date: ${meetingDate.full}`,
-  'type: outlook-meeting',
-  // ... customize frontmatter
-  '---',
-  '',
-  `# ${title}`,
-  // ... customize body
-];
+```powershell
+npx --yes office-addin-manifest validate manifest.xml
 ```
 
-### Adding New Settings
+### Task pane DevTools
 
-1. Add to `DEFAULT_SETTINGS` in [options.js:2-8](options.js#L2-L8)
-2. Add UI element in [options.html](options.html)
-3. Add save/load logic in [options.js](options.js)
-4. Use setting in [popup.js](popup.js) or [content.js](content.js)
+- **Outlook on the Web / Classic Desktop**: right-click in the task pane → Inspect.
+- **New Outlook for Windows**: open Edge → `edge://inspect/#devices` → find the task pane and click **inspect**.
 
-### Changing Company Domain
+## Limitations
 
-Update email checks in [content.js](content.js):
-- Line 237: `if (email && !email.endsWith('@syntax.com'))`
-- Line 299: `if (!email.endsWith('@syntax.com'))`
-
-Replace `@syntax.com` with your company domain.
-
-### Modifying Folder Structure
-
-Change folder path construction in [popup.js:181](popup.js#L181):
-
-```javascript
-// Current: folderPath/YYYY/MM
-const folderPath = `${currentSettings.folderPath}/${extractedData.meetingDate.year}/${extractedData.meetingDate.month}`;
-
-// Custom: folderPath/YYYY-QQ
-const quarter = Math.ceil(parseInt(extractedData.meetingDate.month) / 3);
-const folderPath = `${currentSettings.folderPath}/${extractedData.meetingDate.year}/Q${quarter}`;
-```
-
-## Privacy & Security
-
-- **Local Only**: All processing happens locally in your browser
-- **No Data Sent**: No meeting data is sent to external servers
-- **Permissions**: Only accesses Outlook domains with explicit user action
-- **Storage**: Settings stored in Chrome's sync storage (encrypted by Chrome)
-- **Clipboard**: Optional - can be disabled in settings
-
-## Browser Compatibility
-
-- ✅ Chrome (Manifest V3)
-- ✅ Edge (Chromium-based)
-- ✅ Brave (Chromium-based)
-- ❌ Firefox (uses different manifest format)
-- ❌ Safari (uses different extension system)
-
-## Known Limitations
-
-- Only works with Outlook Web (not desktop Outlook)
-- Requires Obsidian desktop app (not mobile)
-- Scraping may break if Outlook significantly changes UI
-- Maximum 50 scroll attempts for attendee collection
-- Company domain hardcoded to `@syntax.com`
-
-## Future Enhancements
-
-Potential improvements for future versions:
-
-- [ ] Support for multiple company domains
-- [ ] Configurable note templates
-- [ ] Meeting recurrence pattern extraction
-- [ ] Attachment detection and links
-- [ ] Teams meeting link extraction
-- [ ] Custom tag support
-- [ ] Batch extraction for multiple meetings
-- [ ] Export to other formats (CSV, JSON)
-
-## Contributing
-
-Contributions welcome! To contribute:
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
-
-Please maintain existing code style and add comments for complex logic.
+- **Right-click context menu**: Office Add-ins cannot add to Outlook's right-click menu. The add-in only appears via the ribbon. ("Send to OneNote" is a built-in Outlook feature, not an add-in.)
+- **RSVPs for attendee-side views**: see RSVP note above.
+- **Mobile**: not supported. Office.js Mailbox 1.5 features and the `obsidian://` URI handler aren't available in iOS/Android Outlook.
+- **Body conversion accuracy**: Turndown is excellent but Outlook produces some unusual HTML (especially in reply chains). Edge cases may occasionally render imperfectly.
 
 ## License
 
-This project is open source and available under the MIT License.
-
-## Support
-
-For issues, questions, or feature requests:
-- Check the [Troubleshooting](#troubleshooting) section
-- Review existing code comments
-- Open an issue in the repository
-
-## Changelog
-
-### Version 1.1.0
-- Added external meeting detection
-- Improved attendee scrolling logic
-- Added settings page with presets
-- Enhanced error handling
-
-### Version 1.0.0
-- Initial release
-- Basic meeting extraction
-- Obsidian integration
-- RSVP status tracking
-
-## Acknowledgments
-
-Built for seamless integration between Outlook Web and Obsidian note-taking workflows.
+MIT.
