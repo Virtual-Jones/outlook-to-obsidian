@@ -2,19 +2,28 @@
 <!--
   Outlook to Obsidian — Office Add-in Manifest
   =============================================
-  BEFORE DEPLOYING: replace every occurrence of https://virtualjones.github.io/outlook-to-obsidian
-  with the URL where you are hosting these files (e.g. GitHub Pages):
-    https://<your-github-username>.github.io/outlook-to-obsidian
+  This manifest is already pointed at its live host:
+    https://virtualjones.github.io/outlook-to-obsidian   (GitHub Pages, main branch, root)
 
-  SIDELOADING FOR TESTING (no server needed):
-    1. Run: npx office-addin-dev-certs install   (installs a trusted localhost cert)
-    2. Serve this folder: npx http-server -S -C cert.pem -K key.pem -p 3000
-    3. Replace YOUR-HOST with localhost:3000 below
-    4. Sideload via Outlook → File → Options → Trust Center → Trusted Add-in Catalogs
-       OR use https://aka.ms/sideload-apps-for-office
+  IF YOU FORK: replace every occurrence of that URL with your own Pages URL
+    (https://<your-github-username>.github.io/<repo-name>) and generate a fresh
+    <Id> below — PowerShell: [guid]::NewGuid()
+
+  SIDELOADING (per user):
+    Outlook → Get Add-ins → My add-ins → Custom Addins → Add a custom add-in →
+    Add from file → select this manifest.xml
+    (https://aka.ms/olksideload routes to the same dialog)
+
+  LOCAL DEVELOPMENT (serve the folder yourself):
+    1. npx office-addin-dev-certs install        (installs a trusted localhost cert)
+    2. npx http-server . -S -C <cert> -K <key> -p 3000
+    3. Point the URLs below at https://localhost:3000
+    4. Sideload as above
 
   PRODUCTION DEPLOYMENT (Microsoft 365 admin):
     Upload this manifest.xml at admin.microsoft.com → Settings → Integrated apps
+
+  VALIDATE: npx office-addin-manifest validate manifest.xml
 -->
 <OfficeApp
   xmlns="http://schemas.microsoft.com/office/appforoffice/1.1"
@@ -26,15 +35,15 @@
   <!-- Unique add-in identifier — do NOT change after deployment -->
   <Id>55267e54-b786-4113-a715-5b864213fa0b</Id>
   <Version>2.0.0.0</Version>
-  <ProviderName>Syntax Systems Ltd</ProviderName>
+  <ProviderName>virtualjones</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
 
   <DisplayName DefaultValue="Send to Obsidian"/>
-  <Description DefaultValue="Extract meeting details from a calendar appointment and create a formatted Obsidian note."/>
+  <Description DefaultValue="Extract a calendar appointment or email message and create a formatted Obsidian note."/>
 
   <IconUrl DefaultValue="https://virtualjones.github.io/outlook-to-obsidian/icon128.png"/>
   <HighResolutionIconUrl DefaultValue="https://virtualjones.github.io/outlook-to-obsidian/icon128.png"/>
-  <SupportUrl DefaultValue="https://github.com/"/>
+  <SupportUrl DefaultValue="https://github.com/virtualjones/outlook-to-obsidian"/>
 
   <Hosts>
     <Host Name="Mailbox"/>
@@ -42,12 +51,15 @@
 
   <Requirements>
     <Sets>
-      <!-- Mailbox 1.5 required for makeEwsRequestAsync on all platforms -->
+      <!-- Mailbox 1.5: needed for makeEwsRequestAsync and for the
+           MessageRead / AppointmentOrganizer command surfaces -->
       <Set Name="Mailbox" MinVersion="1.5"/>
     </Sets>
   </Requirements>
 
-  <!-- Legacy FormSettings: task pane shown when opening an appointment -->
+  <!-- Legacy FormSettings (classic clients): task pane shown when reading an
+       appointment or message (ItemRead), or editing an appointment (ItemEdit).
+       Modern clients use the VersionOverrides ribbon buttons below instead. -->
   <FormSettings>
     <Form xsi:type="ItemRead">
       <DesktopSettings>
@@ -63,10 +75,15 @@
   </FormSettings>
 
   <!--
-    ReadWriteMailbox: required to call makeEwsRequestAsync (used to fetch
-    attendee RSVP status).  If your deployment policy does not allow this,
-    change to ReadItem — RSVP status will then be unavailable and all
-    attendees will appear under "No Response".
+    ReadWriteMailbox: required to call makeEwsRequestAsync, the original
+    source of attendee RSVP status.  EWS is being retired for Exchange Online
+    (October 2026) and most tenants already block it, so that call usually
+    fails and the add-in falls back to Office.js appointmentResponse.
+
+    ReadItem is therefore sufficient in practice.  On the fallback path RSVP
+    status is still populated for meetings you organize; for meetings you were
+    merely invited to, all attendees appear under "No Response" (a platform
+    limitation, not a permission one).
   -->
   <Permissions>ReadWriteMailbox</Permissions>
 
@@ -186,7 +203,7 @@
         <bt:String id="Button.Label"  DefaultValue="Create Note"/>
       </bt:ShortStrings>
       <bt:LongStrings>
-        <bt:String id="Button.Tooltip" DefaultValue="Extract meeting details and create an Obsidian note"/>
+        <bt:String id="Button.Tooltip" DefaultValue="Extract this meeting or email and create an Obsidian note"/>
       </bt:LongStrings>
     </Resources>
 

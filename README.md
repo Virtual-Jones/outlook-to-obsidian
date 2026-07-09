@@ -29,7 +29,7 @@ External dependencies (loaded at runtime via CDN):
 
 - **[Office.js](https://appsforoffice.microsoft.com/lib/1/hosted/office.js)** — Outlook API
 - **[Turndown 7.2.0](https://github.com/mixmark-io/turndown)** — HTML → Markdown converter
-- **[@joplin/turndown-plugin-gfm](https://github.com/laurent22/joplin-turndown-plugin-gfm)** — GitHub-Flavored Markdown extensions (tables, strikethrough, task lists)
+- **[turndown-plugin-gfm 1.0.2](https://github.com/mixmark-io/turndown-plugin-gfm)** — GitHub-Flavored Markdown extensions (tables, strikethrough, task lists)
 
 ## Installation
 
@@ -86,7 +86,7 @@ tags: meeting
 date: 2026-06-15
 type: outlook-meeting
 external: false
-attendees: ["Alice Brown", "Bob Johnson"]
+attendees: ["Sam Rivera", "Alice Brown", "Bob Johnson", "Carol White", "David Lee", "Emma Davis"]
 summary:
 ---
 
@@ -95,10 +95,10 @@ summary:
 ## Meeting Details
 **Date/Time:** 6/15/2026 14:00 – 15:00
 **Location:** Conference Room A
-**Total Attendees:** 8
+**Total Attendees:** 9
 
 ### Attendees by RSVP Status
-**Organizer:** Mike Jones
+**Organizer:** Sam Rivera
 **Accepted (5):** Alice Brown, Bob Johnson, Carol White, David Lee, Emma Davis
 **Tentative (2):** Frank Miller, Grace Wilson
 **No Response (1):** Henry Taylor
@@ -113,6 +113,8 @@ Discuss Q2 deliverables…
 ## Follow-up
 ```
 
+The `attendees:` frontmatter list holds the **organizer plus accepted attendees only** — not tentative, declined, or no-response. An `**External Meeting:** Yes` line is added under **Meeting Details** when `external: true`.
+
 ### Email note
 
 ```markdown
@@ -120,7 +122,7 @@ Discuss Q2 deliverables…
 tags: email
 date: 2026-06-15
 type: outlook-email
-from: "Luke Kremer <luke.kremer@syntax.com>"
+from: "Sam Rivera <sam.rivera@example.com>"
 external: false
 summary:
 ---
@@ -128,10 +130,10 @@ summary:
 # Re: Project Status
 
 ## Email Details
-**From:** Luke Kremer <luke.kremer@syntax.com>
+**From:** Sam Rivera <sam.rivera@example.com>
 **Sent:** 6/15/2026 09:42
-**To (3):** Leonardo De Araujo, Rebecca Murray, Sarah Abikhzir
-**Cc (1):** Antonella Costanzo
+**To (3):** Alice Brown <alice.brown@example.com>, Bob Johnson <bob.johnson@example.com>, Carol White <carol.white@example.com>
+**Cc (1):** David Lee <david.lee@example.com>
 
 ### Body
 Body content converted from HTML to Markdown, with
@@ -145,16 +147,18 @@ and reply chains as > blockquotes.
 ## Follow-up
 ```
 
+Recipients render as `Name <email>`; the bare name is used only when no address is available. An `**External Email:** Yes` line is added when `external: true`.
+
 ## Settings
 
 Open the task pane → ⚙️ in the top right. Settings roam with your Microsoft 365 account.
 
 | Setting | Default | Description |
 |---|---|---|
-| Vault Name | `Syntax` | Case-sensitive Obsidian vault name |
+| Vault Name | `Notes` | Case-sensitive Obsidian vault name |
 | Meeting Notes Folder | `02. Meeting Notes` | Base folder for meeting notes; `YYYY/MM` subfolders are added automatically |
 | Email Notes Folder | `04. Email Notes` | Base folder for email notes |
-| Internal Email Domain | `syntax.com` | Anyone with another domain is flagged as external |
+| Internal Email Domain | `example.com` | Anyone with another domain is flagged as external |
 | Copy to clipboard | ✓ | Auto-copy the note after extracting |
 | Prefix `[EXTERNAL]` | ✗ | Prepend `[EXTERNAL]` to titles when external participants are present |
 
@@ -162,13 +166,17 @@ Open the task pane → ⚙️ in the top right. Settings roam with your Microsof
 
 ### RSVP detection
 
-Meeting RSVPs come from `EmailAddressDetails.appointmentResponse` on each attendee. This only populates when you're the **organizer** of the meeting. Attendees viewing someone else's meeting cannot see other attendees' responses.
+In read mode the add-in **first** attempts the EWS `GetItem` SOAP call (`getAttendeesViaEws()`), which returns each attendee's `ResponseType`. If that call throws, it falls back to `getAttendeesViaOfficeJs()`, which buckets attendees by `EmailAddressDetails.appointmentResponse`. In compose mode only the Office.js path runs.
 
-(Historically the add-in used the EWS `GetItem` SOAP call for RSVPs, but Microsoft is retiring EWS for Exchange Online in October 2026 and most tenants already block it. The EWS code path remains as a fallback but is expected to fail with `GenericResponseError` on modern M365 tenants.)
+In practice the fallback is the common case: Microsoft is retiring EWS for Exchange Online in October 2026 and most tenants already block it, so the EWS attempt typically fails with `GenericResponseError` and is logged to the console before the fallback runs.
+
+The Office.js fallback only populates `appointmentResponse` when you're the **organizer** of the meeting. Attendees viewing someone else's meeting cannot see other attendees' responses — everyone lands in "No Response".
 
 ### HTML → Markdown body conversion
 
-Bodies are pulled as HTML (plain-text coercion collapses line breaks in New Outlook) and run through Turndown plus the GFM plugin. Outlook-specific cruft (`<o:p>`, MSO conditional comments, inline `<style>`, embedded `cid:` images) is stripped before conversion.
+Bodies are pulled as HTML (plain-text coercion collapses line breaks in New Outlook) and run through Turndown plus the GFM plugin. Outlook-specific cruft — `<o:p>` tags, MSO conditional comments, inline `<style>`/`<meta>`/`<link>` — is stripped by `cleanOutlookHtml()` before conversion, and table markup is normalised by `promoteOutlookTableHeaders()` / `flattenTableCellBlocks()`. Embedded inline images (`src="cid:…"`) are dropped by a custom Turndown rule during conversion.
+
+Two fallbacks guard this path: if `getAsync(Html)` fails the code retries with a plain-text read, and if the Turndown CDN script hasn't loaded it degrades to a sanitized `textContent` dump.
 
 ### Permissions
 

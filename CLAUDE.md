@@ -1,39 +1,48 @@
 # Claude Instructions — Outlook to Obsidian (Office Add-in)
 
 ## Project Overview
-An **Office Add-in** (previously a Chrome extension) that extracts meeting details from an Outlook calendar appointment using the Office.js API and creates a formatted Obsidian note via the `obsidian://` URI scheme.
+An **Office Add-in** (previously a Chrome extension) that extracts a **calendar appointment or an email message** from Outlook using the Office.js API and creates a formatted Obsidian note via the `obsidian://` URI scheme. The task pane auto-detects which item type is open and adapts.
 
 Works in: Outlook on the Web (Microsoft 365), Outlook Desktop (Windows & Mac), New Outlook for Windows.
 
 **Architecture:**
-- **Manifest** ([manifest.xml](manifest.xml)) — Office Add-in manifest; declares the ribbon button and task pane URL
+- **Manifest** ([manifest.xml](manifest.xml)) — Office Add-in manifest; declares the ribbon buttons and task pane URL
 - **Task Pane UI** ([taskpane.html](taskpane.html)) — the add-in interface, includes both main view and settings panel
 - **Task Pane Logic** ([taskpane.js](taskpane.js)) — all extraction and UI logic using `Office.context.mailbox.item`
 - **Function File** ([commands.html](commands.html)) — required by the manifest; currently a no-op placeholder
+
+**Runtime dependencies** (loaded from CDN in [taskpane.html](taskpane.html)):
+- **Office.js** — Outlook API
+- **Turndown** + **@joplin/turndown-plugin-gfm** — HTML → Markdown conversion of item bodies
 
 ## Key Files & Responsibilities
 
 ### [taskpane.js](taskpane.js) — Core Logic
 - `Office.onReady()` bootstraps the add-in
+- `getCurrentItemType()` / `applyContextLabels()` — detect appointment vs message and relabel the UI
 - `extractMeetingDetails()` reads all meeting data via Office.js API
+- `extractEmailDetails()` reads message data (from / to / cc / sent / body)
 - `getItemProperty(propOrValue)` — handles both read-mode (direct value) and compose-mode (`getAsync()`) property access
+- `getBodyMarkdown(item)` — pulls the body as HTML and converts to Markdown via Turndown
+- `cleanOutlookHtml()`, `promoteOutlookTableHeaders()`, `flattenTableCellBlocks()` — pre-Turndown HTML normalisation
 - `getAttendeesViaEws(itemId)` — fetches RSVP status via EWS `GetItem` SOAP call; requires `ReadWriteMailbox` permission
 - `parseEwsAttendees(xmlString)` — parses the EWS XML response into the `attendeesByStatus` map
-- `getAttendeesViaOfficeJs(item)` — fallback when EWS is unavailable (no RSVP status, all shown as "No Response")
+- `getAttendeesViaOfficeJs(item)` — fallback when EWS is unavailable; buckets by `appointmentResponse`
 - Settings stored in `Office.context.roamingSettings` (roam with the user's Exchange account)
 
 ### [taskpane.html](taskpane.html) — UI
 - Main panel: config display, Extract button, status, details summary, Open in Obsidian + Copy buttons
-- Settings panel: vault name, folder path, internal domain, options checkboxes
+- Settings panel: vault name, meeting folder, email folder, internal domain, options checkboxes
 - Hidden `<a id="obsidianLink">` anchor — clicked programmatically to trigger the `obsidian://` protocol handler (most reliable cross-platform approach)
 
 ### [manifest.xml](manifest.xml) — Add-in Manifest
-- Add-in ID: `4b7f2d1e-8a3c-4e5f-9b6d-0c1a2b3d4e5f`
+- Add-in ID: `55267e54-b786-4113-a715-5b864213fa0b` (do NOT change after deployment)
 - Version: 2.0.0.0
 - Requires Mailbox 1.5+
-- Permission: `ReadWriteMailbox` (needed for `makeEwsRequestAsync`)
-- Extension points: `AppointmentAttendeeCommandSurface` + `AppointmentOrganizerCommandSurface`
-- **Contains placeholder URL** `https://YOUR-HOST/outlook-to-obsidian` — must be replaced with the actual hosting URL before deployment
+- Permission: `ReadWriteMailbox` (originally for `makeEwsRequestAsync`; `ReadItem` would now suffice)
+- Extension points: `AppointmentAttendeeCommandSurface`, `AppointmentOrganizerCommandSurface`, `MessageReadCommandSurface`
+- Hosted at `https://virtualjones.github.io/outlook-to-obsidian` — forks must replace every occurrence with their own Pages URL and regenerate `<Id>`
+- Validate with `npx --yes office-addin-manifest validate manifest.xml`
 
 ## Important Patterns & Conventions
 
@@ -62,21 +71,26 @@ EWS `GetItem` with `calendar:RequiredAttendees` and `calendar:OptionalAttendees`
 | `None` / `NoResponseReceived` | No Response |
 | `Organizer` | skipped (captured via `item.organizer`) |
 
-EWS is only available in read mode (requires `item.itemId`). If EWS fails, the code falls back to the Office.js API which provides attendees without RSVP status.
+EWS is only available in read mode (requires `item.itemId`). If EWS fails, the code falls back to `getAttendeesViaOfficeJs()`, which buckets attendees by `EmailAddressDetails.appointmentResponse` — this only populates when the current user **organized** the meeting; otherwise everyone lands in "No Response".
+
+**EWS is being retired for Exchange Online (October 2026)** and most tenants already block it, so the fallback path is the common case on modern M365. `getAttendeesViaEws()` is still attempted first in read mode and typically fails with `GenericResponseError`.
 
 ### Settings
 Stored in `Office.context.roamingSettings` (max 32 KB, roams with Exchange account):
 
 | Key | Default | Description |
 |---|---|---|
-| `vaultName` | `Syntax` | Obsidian vault name |
-| `folderPath` | `02. Meeting Notes` | Base folder for notes |
-| `internalDomain` | `syntax.com` | Email domain treated as internal |
+| `vaultName` | `Notes` | Obsidian vault name |
+| `folderPath` | `02. Meeting Notes` | Base folder for meeting notes |
+| `emailFolderPath` | `04. Email Notes` | Base folder for email notes |
+| `internalDomain` | `example.com` | Email domain treated as internal |
 | `copyToClipboard` | `true` | Auto-copy note after extracting |
 | `includeExternal` | `false` | Prefix title with `[EXTERNAL]` |
 
+Code reads the fallback from `DEFAULT_SETTINGS`, never a duplicated literal.
+
 ### Data Formatting
-- **File path**: `folderPath/YYYY/MM/YYYY-MM-DD Title.md`
+- **File path**: `folderPath|emailFolderPath/YYYY/MM/YYYY-MM-DD Title.md`
 - **Safe filenames**: `replace(/[<>:"/\\|?*]/g, '-')`
 - **Line endings**: CRLF (`\r\n`)
 - **Obsidian URI**: `obsidian://new?vault=NAME&file=PATH&content=ENCODED`
@@ -121,15 +135,16 @@ summary:
 
 ## Deployment
 
-### Option A — GitHub Pages (recommended for personal/team use)
-1. Push the repository to GitHub
-2. Enable Pages on the `main` branch
-3. Replace all `https://YOUR-HOST/outlook-to-obsidian` in [manifest.xml](manifest.xml) with
-   `https://<your-username>.github.io/<repo-name>`
-4. Sideload via Outlook → Get Add-ins → My Add-ins → Add a custom add-in → Add from file
+The manifest already points at `https://virtualjones.github.io/outlook-to-obsidian` (GitHub Pages, `main` branch, root).
+
+### Option A — GitHub Pages (current setup; also the path for forks)
+1. Enable Pages on the repo (Settings → Pages → Deploy from `main` / root)
+2. If forking: replace every `https://virtualjones.github.io/outlook-to-obsidian` in [manifest.xml](manifest.xml)
+   with `https://<your-username>.github.io/<repo-name>`, and generate a fresh `<Id>` (`[guid]::NewGuid()`)
+3. Sideload via Outlook → Get Add-ins → My Add-ins → Add a custom add-in → Add from file
 
 ### Option B — Microsoft 365 Admin Centre (organisation-wide)
-1. Host files on any HTTPS server (replace `YOUR-HOST` in manifest.xml)
+1. Host files on any HTTPS server (update the URLs in manifest.xml)
 2. admin.microsoft.com → Settings → Integrated apps → Upload custom app → Upload manifest XML
 
 ### Option C — Local development
@@ -140,7 +155,7 @@ npx office-addin-dev-certs install
 # Serve the folder
 npx http-server . -S -C ~/.office-addin-dev-certs/localhost.crt -K ~/.office-addin-dev-certs/localhost.key -p 3000
 
-# In manifest.xml: replace YOUR-HOST with localhost:3000
+# In manifest.xml: point the URLs at https://localhost:3000
 # Sideload via Outlook ribbon → Get Add-ins → My Add-ins → Add from file
 ```
 
@@ -174,8 +189,12 @@ Office.context.mailbox.item.location          // string | Location
 Office.context.mailbox.item.organizer         // EmailAddressDetails (read only)
 Office.context.mailbox.item.requiredAttendees // EmailAddressDetails[] | Recipients
 Office.context.mailbox.item.optionalAttendees // EmailAddressDetails[] | Recipients
-Office.context.mailbox.item.body.getAsync()   // plain text body
+Office.context.mailbox.item.from || .sender   // message mode
+Office.context.mailbox.item.to / .cc          // EmailAddressDetails[]
+Office.context.mailbox.item.dateTimeCreated   // sent time (falls back to dateTimeModified)
+Office.context.mailbox.item.body.getAsync()   // Office.CoercionType.Html (not text)
 Office.context.mailbox.item.itemId            // string (read mode only)
+Office.context.mailbox.item.itemType          // Appointment | Message
 Office.context.mailbox.makeEwsRequestAsync()  // EWS SOAP for RSVP status
 Office.context.roamingSettings                // persistent settings storage
 ```
