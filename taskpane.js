@@ -14,10 +14,10 @@
 
 /* ── Defaults ────────────────────────────────────────────────────────────── */
 const DEFAULT_SETTINGS = {
-  vaultName:       'Syntax',
+  vaultName:       'Notes',
   folderPath:      '02. Meeting Notes',
   emailFolderPath: '04. Email Notes',
-  internalDomain:  'syntax.com',
+  internalDomain:  'example.com',
   copyToClipboard: true,
   includeExternal: false,
 };
@@ -401,7 +401,7 @@ async function extractMeetingDetails() {
   }
 
   /* ── External attendee detection ──────────────────────────────────────── */
-  const internalSuffix = '@' + (settings.internalDomain || 'syntax.com')
+  const internalSuffix = '@' + (settings.internalDomain || DEFAULT_SETTINGS.internalDomain)
     .toLowerCase()
     .replace(/^@/, '');
 
@@ -525,7 +525,7 @@ async function extractEmailDetails() {
   const body = await getBodyMarkdown(item);
 
   /* ── External detection ───────────────────────────────────────────────── */
-  const internalSuffix = '@' + (settings.internalDomain || 'syntax.com')
+  const internalSuffix = '@' + (settings.internalDomain || DEFAULT_SETTINGS.internalDomain)
     .toLowerCase()
     .replace(/^@/, '');
 
