@@ -41,7 +41,7 @@ Works in: Outlook on the Web (Microsoft 365), Outlook Desktop (Windows & Mac), N
 - Requires Mailbox 1.5+
 - Permission: `ReadWriteMailbox` (originally for `makeEwsRequestAsync`; `ReadItem` would now suffice)
 - Extension points: `AppointmentAttendeeCommandSurface`, `AppointmentOrganizerCommandSurface`, `MessageReadCommandSurface`
-- Hosted at `https://virtualjones.github.io/outlook-to-obsidian` — forks must replace every occurrence with their own Pages URL and regenerate `<Id>`
+- Hosted at `https://virtual-jones.github.io/outlook-to-obsidian` — forks must replace every occurrence with their own Pages URL and regenerate `<Id>`
 - Validate with `npx --yes office-addin-manifest validate manifest.xml`
 
 ## Important Patterns & Conventions
@@ -135,11 +135,11 @@ summary:
 
 ## Deployment
 
-The manifest already points at `https://virtualjones.github.io/outlook-to-obsidian` (GitHub Pages, `main` branch, root).
+The manifest already points at `https://virtual-jones.github.io/outlook-to-obsidian` (GitHub Pages, `main` branch, root).
 
 ### Option A — GitHub Pages (current setup; also the path for forks)
 1. Enable Pages on the repo (Settings → Pages → Deploy from `main` / root)
-2. If forking: replace every `https://virtualjones.github.io/outlook-to-obsidian` in [manifest.xml](manifest.xml)
+2. If forking: replace every `https://virtual-jones.github.io/outlook-to-obsidian` in [manifest.xml](manifest.xml)
    with `https://<your-username>.github.io/<repo-name>`, and generate a fresh `<Id>` (`[guid]::NewGuid()`)
 3. Sideload via Outlook → Get Add-ins → My Add-ins → Add a custom add-in → Add from file
 

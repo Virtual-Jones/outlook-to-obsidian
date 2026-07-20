@@ -33,7 +33,7 @@ External dependencies (loaded at runtime via CDN):
 
 ## Installation
 
-The add-in is hosted via **GitHub Pages** at `https://virtualjones.github.io/outlook-to-obsidian/` and sideloaded into Outlook by uploading the `manifest.xml` file.
+The add-in is hosted via **GitHub Pages** at `https://virtual-jones.github.io/outlook-to-obsidian/` and sideloaded into Outlook by uploading the `manifest.xml` file.
 
 ### Per-user sideload
 
@@ -52,7 +52,7 @@ Upload `manifest.xml` at https://admin.microsoft.com → Settings → Integrated
 If you fork this repo:
 
 1. Enable GitHub Pages on your fork (Settings → Pages → Deploy from `main` / root).
-2. Replace all `https://virtualjones.github.io/outlook-to-obsidian` URLs in `manifest.xml` with your own Pages URL.
+2. Replace all `https://virtual-jones.github.io/outlook-to-obsidian` URLs in `manifest.xml` with your own Pages URL.
 3. Generate a new GUID for the `<Id>` element (PowerShell: `[guid]::NewGuid()`).
 4. Sideload the updated manifest as above.
 

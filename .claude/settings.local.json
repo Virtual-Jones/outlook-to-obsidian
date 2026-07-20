@@ -5,7 +5,9 @@
       "Bash(npx --yes office-addin-manifest validate manifest.xml)",
       "PowerShell(npx --yes office-addin-manifest validate manifest.xml 2>&1)",
       "PowerShell([guid]::NewGuid\\(\\).ToString\\(\\))",
-      "PowerShell(New-Item -ItemType Directory -Force \"$env:APPDATA\\\\npm\" | Out-Null; npx --yes office-addin-manifest validate manifest.xml 2>&1)"
+      "PowerShell(New-Item -ItemType Directory -Force \"$env:APPDATA\\\\npm\" | Out-Null; npx --yes office-addin-manifest validate manifest.xml 2>&1)",
+      "PowerShell(git push origin publish 2>&1)",
+      "PowerShell(gh repo view virtualjones/outlook-to-obsidian --json visibility,defaultBranchRef,hasPages 2>&1)"
     ]
   }
 }
