@@ -161,6 +161,7 @@ Open the task pane → ⚙️ in the top right. Settings roam with your Microsof
 | Internal Email Domain | `example.com` | Anyone with another domain is flagged as external |
 | Copy to clipboard | ✓ | Auto-copy the note after extracting |
 | Prefix `[EXTERNAL]` | ✗ | Prepend `[EXTERNAL]` to titles when external participants are present |
+| Remove online meeting join details | ✗ | Strip Teams, Zoom, Webex and Google Meet join blocks (link, meeting ID, dial-in, footer) from the description/body |
 
 ## Key implementation notes
 
