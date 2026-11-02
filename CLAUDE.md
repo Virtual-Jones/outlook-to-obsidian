@@ -86,6 +86,7 @@ Stored in `Office.context.roamingSettings` (max 32 KB, roams with Exchange accou
 | `internalDomain` | `example.com` | Email domain treated as internal |
 | `copyToClipboard` | `true` | Auto-copy note after extracting |
 | `includeExternal` | `false` | Prefix title with `[EXTERNAL]` |
+| `stripMeetingJoinInfo` | `false` | Remove Teams / Zoom / Webex / Google Meet join blocks from the body via `stripMeetingJoinBlocks()` (meetings and emails); provider patterns live in `JOIN_FENCES` / `JOIN_RUNS` |
 
 Code reads the fallback from `DEFAULT_SETTINGS`, never a duplicated literal.
 

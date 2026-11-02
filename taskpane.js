@@ -20,6 +20,7 @@ const DEFAULT_SETTINGS = {
   internalDomain:  'example.com',
   copyToClipboard: true,
   includeExternal: false,
+  stripMeetingJoinInfo: false,
 };
 
 let settings = { ...DEFAULT_SETTINGS };
@@ -128,6 +129,7 @@ function onSaveSettings() {
   settings.internalDomain  = internalDomain || DEFAULT_SETTINGS.internalDomain;
   settings.copyToClipboard = document.getElementById('copyToClipboard').checked;
   settings.includeExternal = document.getElementById('includeExternal').checked;
+  settings.stripMeetingJoinInfo = document.getElementById('stripMeetingJoinInfo').checked;
 
   try {
     const rs = Office.context.roamingSettings;
@@ -153,6 +155,7 @@ function populateSettingsForm() {
   document.getElementById('internalDomain').value    = settings.internalDomain;
   document.getElementById('copyToClipboard').checked = settings.copyToClipboard;
   document.getElementById('includeExternal').checked = settings.includeExternal;
+  document.getElementById('stripMeetingJoinInfo').checked = settings.stripMeetingJoinInfo;
 }
 
 function updateConfigDisplay() {
@@ -376,7 +379,8 @@ async function extractMeetingDetails() {
   }
 
   /* ── Body / Description (HTML → Markdown) ─────────────────────────────── */
-  const body = await getBodyMarkdown(item);
+  let body = await getBodyMarkdown(item);
+  if (settings.stripMeetingJoinInfo) body = stripMeetingJoinBlocks(body);
 
   /* ── Attendees with RSVP ──────────────────────────────────────────────── */
   let attendeesByStatus = {
@@ -522,7 +526,10 @@ async function extractEmailDetails() {
   const ccFormatted = ccList.map(formatPerson).filter(Boolean);
 
   /* ── Body (HTML → Markdown) ───────────────────────────────────────────── */
-  const body = await getBodyMarkdown(item);
+  // Meeting requests opened from the inbox arrive here as messages, so the
+  // join-info strip applies to emails too.
+  let body = await getBodyMarkdown(item);
+  if (settings.stripMeetingJoinInfo) body = stripMeetingJoinBlocks(body);
 
   /* ── External detection ───────────────────────────────────────────────── */
   const internalSuffix = '@' + (settings.internalDomain || DEFAULT_SETTINGS.internalDomain)
@@ -697,6 +704,96 @@ function getBodyMarkdown(item) {
       }
     });
   });
+}
+
+/* ── Online-meeting join blocks ──────────────────────────────────────────────
+   Patterns run against trimmed Turndown output, where '_' and a leading '-'
+   arrive backslash-escaped (raw in the plain-text fallback).
+
+   Teams and Google Calendar fence the block between delimiter lines; a fence
+   with no closing line runs to the end of the body. Teams' underscore fence
+   only counts when the next line names Microsoft Teams, so ordinary
+   underscore separators (e.g. Outlook's plain-text reply header) survive.
+
+   Zoom and Webex don't fence, so their block runs from a start line through
+   the last line that still looks like join info, tolerating one stray line. */
+const JOIN_FENCES = [
+  { fence: /^(?:\\?_){20,}$/, title: /Microsoft Teams/i },  // Teams
+  { fence: /^\\?-::~[:~]*::-$/ },                            // Google Calendar (Meet, or Zoom added in Google)
+];
+
+const JOIN_RUNS = [
+  { // Zoom
+    start: /is inviting you to a scheduled Zoom (?:meeting|webinar)|^\W*Join Zoom Meeting\b/i,
+    info:  /zoom\.us|zoomcrc\.com|zoom (?:meeting|webinar)/i,
+  },
+  { // Webex
+    start: /Do not delete or change any of the following text|join (?:the|your) Webex meeting|^\W*(?:Cisco )?Webex meeting\W*$/i,
+    info:  /webex|ways to join|host information/i,
+  },
+  { // Google Meet outside Google's fence (e.g. the Meet add-in for Outlook)
+    start: /^\W*(?:Join (?:with )?Google Meet|Google Meet joining info)\b/i,
+    info:  /meet\.google\.com|tel\.meet|more phone numbers|learn more about meet|do not edit this section/i,
+  },
+];
+
+// Lines common to every provider's join / dial-in section.
+const JOIN_INFO_LINE = new RegExp([
+  /meeting (?:id|number|password|link)|webinar id|conference id/,
+  /pass(?:code|word)|\bpin\b|access code|toll/,
+  /dial|call-in|one tap|tap to join|join (?:by|from|using|with|instructions|meeting)/,
+  /local number|^[\s•*\\[-]*\+\d/,             // phone numbers
+  /\b\d{1,3}(?:\.\d{1,3}){3}\b/,               // H.323 IP addresses
+  /^\\?(?:-{3,}|\* \* \*)$/,                   // horizontal rules
+].map(r => r.source).join('|'), 'i');
+
+const JOIN_RUN_MAX_GAP = 1;
+const JOIN_LEAD = /^Hi there,?$/i;   // Zoom's greeting above "… is inviting you"
+
+/** Remove online-meeting join blocks (link, meeting ID, dial-in, footer). */
+function stripMeetingJoinBlocks(md) {
+  const lines = md.split(/\r?\n/);
+  const kept  = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const end = joinBlockEnd(lines, i);
+    if (end === -1) { kept.push(lines[i]); continue; }
+
+    let k = kept.length - 1;
+    while (k >= 0 && !kept[k].trim()) k--;
+    if (k >= 0 && JOIN_LEAD.test(kept[k].trim())) kept.length = k;
+
+    i = end;   // skip the block, including any closing fence
+  }
+
+  return kept.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+
+/** Index of the last line of a join block starting at lines[i], or -1. */
+function joinBlockEnd(lines, i) {
+  const line = lines[i].trim();
+
+  for (const { fence, title } of JOIN_FENCES) {
+    if (!fence.test(line)) continue;
+    let end = i + 1;
+    while (end < lines.length && !fence.test(lines[end].trim())) end++;
+    const firstLine = lines.slice(i + 1, end).find(l => l.trim()) || '';
+    if (!title || title.test(firstLine)) return Math.min(end, lines.length - 1);
+  }
+
+  for (const { start, info } of JOIN_RUNS) {
+    if (!start.test(line)) continue;
+    let last = i;
+    for (let j = i + 1, gap = 0; j < lines.length && gap <= JOIN_RUN_MAX_GAP; j++) {
+      const l = lines[j].trim();
+      if (!l) continue;
+      if (info.test(l) || JOIN_INFO_LINE.test(l)) { last = j; gap = 0; }
+      else gap++;
+    }
+    return last;
+  }
+
+  return -1;
 }
 
 /**
